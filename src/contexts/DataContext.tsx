@@ -3,6 +3,7 @@ import React, { createContext, useContext, useState, ReactNode } from 'react';
 export interface Employee {
   id: string;
   email: string;
+  password: string;
 }
 
 export interface Expense {
@@ -18,7 +19,7 @@ export interface Expense {
 interface DataContextType {
   employees: Employee[];
   expenses: Expense[];
-  addEmployee: (email: string) => void;
+  addEmployee: (email: string, password: string) => void;
   deleteEmployee: (id: string) => void;
   addExpense: (expense: Omit<Expense, 'id' | 'timestamp'>) => void;
 }
@@ -26,10 +27,10 @@ interface DataContextType {
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
 const INITIAL_EMPLOYEES: Employee[] = [
-  { id: '1', email: 'admin@company.com' },
-  { id: '2', email: 'user@company.com' },
-  { id: '3', email: 'john.doe@company.com' },
-  { id: '4', email: 'jane.smith@company.com' },
+  { id: '1', email: 'admin@company.com', password: 'admin123' },
+  { id: '2', email: 'user@company.com', password: 'user123' },
+  { id: '3', email: 'john.doe@company.com', password: 'pass123' },
+  { id: '4', email: 'jane.smith@company.com', password: 'pass123' },
 ];
 
 const INITIAL_EXPENSES: Expense[] = [
@@ -73,10 +74,11 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return saved ? JSON.parse(saved) : INITIAL_EXPENSES;
   });
 
-  const addEmployee = (email: string) => {
+  const addEmployee = (email: string, password: string) => {
     const newEmployee: Employee = {
       id: Date.now().toString(),
       email,
+      password,
     };
     const updated = [...employees, newEmployee];
     setEmployees(updated);

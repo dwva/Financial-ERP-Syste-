@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
+import { Employee } from './DataContext';
 
 interface User {
   email: string;
@@ -7,16 +8,11 @@ interface User {
 
 interface AuthContextType {
   user: User | null;
-  login: (email: string, password: string) => boolean;
+  login: (email: string, password: string, employees: Employee[]) => boolean;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-const DUMMY_CREDENTIALS = [
-  { email: 'admin@company.com', password: 'admin123', role: 'admin' as const },
-  { email: 'user@company.com', password: 'user123', role: 'user' as const },
-];
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(() => {
@@ -24,13 +20,22 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return savedUser ? JSON.parse(savedUser) : null;
   });
 
-  const login = (email: string, password: string): boolean => {
-    const credential = DUMMY_CREDENTIALS.find(
-      (cred) => cred.email === email && cred.password === password
+  const login = (email: string, password: string, employees: Employee[]): boolean => {
+    // Check if it's an admin
+    if (email === 'admin@company.com' && password === 'admin123') {
+      const userData = { email, role: 'admin' as const };
+      setUser(userData);
+      localStorage.setItem('user', JSON.stringify(userData));
+      return true;
+    }
+
+    // Check if it's a regular user
+    const employee = employees.find(
+      (emp) => emp.email === email && emp.password === password
     );
 
-    if (credential) {
-      const userData = { email: credential.email, role: credential.role };
+    if (employee) {
+      const userData = { email: employee.email, role: 'user' as const };
       setUser(userData);
       localStorage.setItem('user', JSON.stringify(userData));
       return true;

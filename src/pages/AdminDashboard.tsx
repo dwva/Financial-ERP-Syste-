@@ -1,9 +1,11 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import UserManagement from '@/components/admin/UserManagement';
-import AllExpensesTable from '@/components/admin/AllExpensesTable';
-import { LogOut, LayoutDashboard } from 'lucide-react';
+import AllExpensesTableEnhanced from '@/components/admin/AllExpensesTableEnhanced';
+import ExpenseAnalytics from '@/components/admin/ExpenseAnalytics';
+import { LogOut, LayoutDashboard, BarChart3, Receipt, Users } from 'lucide-react';
 
 const AdminDashboard = () => {
   const { user, logout } = useAuth();
@@ -37,10 +39,34 @@ const AdminDashboard = () => {
       </header>
 
       <main className="container mx-auto px-4 py-8">
-        <div className="space-y-6">
-          <UserManagement />
-          <AllExpensesTable />
-        </div>
+        <Tabs defaultValue="analytics" className="space-y-6">
+          <TabsList className="grid w-full max-w-md grid-cols-3">
+            <TabsTrigger value="analytics" className="gap-2">
+              <BarChart3 className="w-4 h-4" />
+              Analytics
+            </TabsTrigger>
+            <TabsTrigger value="expenses" className="gap-2">
+              <Receipt className="w-4 h-4" />
+              Expenses
+            </TabsTrigger>
+            <TabsTrigger value="users" className="gap-2">
+              <Users className="w-4 h-4" />
+              Users
+            </TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="analytics">
+            <ExpenseAnalytics />
+          </TabsContent>
+          
+          <TabsContent value="expenses">
+            <AllExpensesTableEnhanced />
+          </TabsContent>
+          
+          <TabsContent value="users">
+            <UserManagement />
+          </TabsContent>
+        </Tabs>
       </main>
     </div>
   );

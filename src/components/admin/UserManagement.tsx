@@ -12,14 +12,16 @@ import { UserPlus, Trash2, Users } from 'lucide-react';
 const UserManagement = () => {
   const { employees, addEmployee, deleteEmployee } = useData();
   const [newEmail, setNewEmail] = useState('');
+  const [newPassword, setNewPassword] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   const handleAddEmployee = (e: React.FormEvent) => {
     e.preventDefault();
-    if (newEmail) {
-      addEmployee(newEmail);
+    if (newEmail && newPassword) {
+      addEmployee(newEmail, newPassword);
       toast.success('Employee added successfully!');
       setNewEmail('');
+      setNewPassword('');
       setIsDialogOpen(false);
     }
   };
@@ -67,6 +69,17 @@ const UserManagement = () => {
                     placeholder="employee@company.com"
                     value={newEmail}
                     onChange={(e) => setNewEmail(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="new-password">Password</Label>
+                  <Input
+                    id="new-password"
+                    type="password"
+                    placeholder="Enter password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
                     required
                   />
                 </div>
