@@ -1,9 +1,23 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { 
+  getEmployees, 
+  getExpenses, 
+  createExpense, 
+  createEmployeeUser,
+  updateEmployee as updateEmployeeService,
+  deleteEmployee as deleteEmployeeService,
+  deleteExpense as deleteExpenseService
+} from '@/services/firebaseService';
 
 export interface Employee {
   id: string;
   email: string;
-  password: string;
+  password?: string;
+  name?: string;
+  sector?: string;
+  age?: number;
+  status?: 'employee' | 'founder' | 'manager' | 'intern' | 'admin';
+  created_at?: string;
 }
 
 export interface Expense {
@@ -14,92 +28,138 @@ export interface Expense {
   file: string | null;
   fileName: string | null;
   timestamp: string;
+  date: string;
+  company: string;
+  sector: string;
+  created_at?: string;
 }
 
 interface DataContextType {
   employees: Employee[];
   expenses: Expense[];
-  addEmployee: (email: string, password: string) => void;
-  deleteEmployee: (id: string) => void;
-  addExpense: (expense: Omit<Expense, 'id' | 'timestamp'>) => void;
+  loading: boolean;
+  error: string | null;
+  addEmployee: (email: string, password: string) => Promise<void>;
+  deleteEmployee: (id: string) => Promise<void>;
+  addExpense: (expense: Omit<Expense, 'id' | 'timestamp'>) => Promise<void>;
+  updateEmployee: (updatedEmployee: Employee) => Promise<void>;
+  updateEmployeeStatus: (id: string, status: 'employee' | 'admin') => Promise<void>;
+  refreshData: () => Promise<void>;
+  deleteExpense: (id: string) => Promise<void>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
-const INITIAL_EMPLOYEES: Employee[] = [
-  { id: '1', email: 'admin@company.com', password: 'admin123' },
-  { id: '2', email: 'user@company.com', password: 'user123' },
-  { id: '3', email: 'john.doe@company.com', password: 'pass123' },
-  { id: '4', email: 'jane.smith@company.com', password: 'pass123' },
-];
+export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-const INITIAL_EXPENSES: Expense[] = [
-  {
-    id: '1',
-    userId: 'user@company.com',
-    amount: 200,
-    description: 'Team Lunch',
-    file: null,
-    fileName: 'receipt.pdf',
-    timestamp: '2025-09-28',
-  },
-  {
-    id: '2',
-    userId: 'john.doe@company.com',
-    amount: 450,
-    description: 'Office Supplies',
-    file: null,
-    fileName: 'invoice.pdf',
-    timestamp: '2025-09-29',
-  },
-  {
-    id: '3',
-    userId: 'user@company.com',
-    amount: 120,
-    description: 'Transport',
-    file: null,
-    fileName: 'ticket.jpg',
-    timestamp: '2025-09-30',
-  },
-];
+  // Fetch initial data
+  useEffect(() => {
+    refreshData();
+  }, []);
 
-export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [employees, setEmployees] = useState<Employee[]>(() => {
-    const saved = localStorage.getItem('employees');
-    return saved ? JSON.parse(saved) : INITIAL_EMPLOYEES;
-  });
-
-  const [expenses, setExpenses] = useState<Expense[]>(() => {
-    const saved = localStorage.getItem('expenses');
-    return saved ? JSON.parse(saved) : INITIAL_EXPENSES;
-  });
-
-  const addEmployee = (email: string, password: string) => {
-    const newEmployee: Employee = {
-      id: Date.now().toString(),
-      email,
-      password,
-    };
-    const updated = [...employees, newEmployee];
-    setEmployees(updated);
-    localStorage.setItem('employees', JSON.stringify(updated));
+  const refreshData = async () => {
+    try {
+      setLoading(true);
+      const [employeesData, expensesData] = await Promise.all([
+        getEmployees(),
+        getExpenses()
+      ]);
+      setEmployees(employeesData);
+      setExpenses(expensesData);
+      setError(null);
+    } catch (err) {
+      console.error('Error fetching data:', err);
+      setError('Failed to load data');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const deleteEmployee = (id: string) => {
-    const updated = employees.filter((emp) => emp.id !== id);
-    setEmployees(updated);
-    localStorage.setItem('employees', JSON.stringify(updated));
+  const addEmployee = async (email: string, password: string) => {
+    try {
+      // Create user in Firebase Authentication and Firestore
+      await createEmployeeUser(email, password);
+      // Refresh data to show the new employee
+      await refreshData();
+    } catch (err) {
+      console.error('Error adding employee:', err);
+      setError('Failed to add employee');
+      throw err;
+    }
   };
 
-  const addExpense = (expense: Omit<Expense, 'id' | 'timestamp'>) => {
-    const newExpense: Expense = {
-      ...expense,
-      id: Date.now().toString(),
-      timestamp: new Date().toISOString().split('T')[0],
-    };
-    const updated = [...expenses, newExpense];
-    setExpenses(updated);
-    localStorage.setItem('expenses', JSON.stringify(updated));
+  const deleteEmployee = async (id: string) => {
+    try {
+      await deleteEmployeeService(id);
+      setEmployees(prev => prev.filter(emp => emp.id !== id));
+    } catch (err) {
+      console.error('Error deleting employee:', err);
+      setError('Failed to delete employee');
+      throw err;
+    }
+  };
+
+  const updateEmployee = async (updatedEmployee: Employee) => {
+    try {
+      await updateEmployeeService(updatedEmployee.id, updatedEmployee);
+      setEmployees(prev => 
+        prev.map(emp => emp.id === updatedEmployee.id ? updatedEmployee : emp)
+      );
+    } catch (err) {
+      console.error('Error updating employee:', err);
+      setError('Failed to update employee');
+      throw err;
+    }
+  };
+
+  const updateEmployeeStatus = async (id: string, status: 'employee' | 'admin') => {
+    try {
+      const employeeToUpdate = employees.find(emp => emp.id === id);
+      if (employeeToUpdate) {
+        const updatedEmployee = {
+          ...employeeToUpdate,
+          status
+        };
+        await updateEmployeeService(id, { status });
+        setEmployees(prev => 
+          prev.map(emp => emp.id === id ? updatedEmployee : emp)
+        );
+      }
+    } catch (err) {
+      console.error('Error updating employee status:', err);
+      setError('Failed to update employee status');
+      throw err;
+    }
+  };
+
+  const addExpense = async (expense: Omit<Expense, 'id' | 'timestamp'>) => {
+    try {
+      const newExpense = {
+        ...expense,
+        timestamp: new Date().toISOString().split('T')[0],
+      };
+      const createdExpense = await createExpense(newExpense);
+      setExpenses(prev => [...prev, createdExpense as Expense]);
+    } catch (err) {
+      console.error('Error adding expense:', err);
+      setError('Failed to add expense');
+      throw err;
+    }
+  };
+
+  const deleteExpense = async (id: string) => {
+    try {
+      await deleteExpenseService(id);
+      setExpenses(prev => prev.filter(exp => exp.id !== id));
+    } catch (err) {
+      console.error('Error deleting expense:', err);
+      setError('Failed to delete expense');
+      throw err;
+    }
   };
 
   return (
@@ -107,9 +167,15 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       value={{
         employees,
         expenses,
+        loading,
+        error,
         addEmployee,
         deleteEmployee,
         addExpense,
+        updateEmployee,
+        updateEmployeeStatus,
+        refreshData,
+        deleteExpense
       }}
     >
       {children}

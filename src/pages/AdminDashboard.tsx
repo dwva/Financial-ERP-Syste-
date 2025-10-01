@@ -1,74 +1,128 @@
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useData } from '@/contexts/DataContext';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import UserManagement from '@/components/admin/UserManagement';
 import AllExpensesTableEnhanced from '@/components/admin/AllExpensesTableEnhanced';
 import ExpenseAnalytics from '@/components/admin/ExpenseAnalytics';
-import { LogOut, LayoutDashboard, BarChart3, Receipt, Users } from 'lucide-react';
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+  SidebarTrigger,
+} from '@/components/ui/sidebar';
+import {
+  LogOut,
+  LayoutDashboard,
+  BarChart3,
+  Receipt,
+  Users,
+} from 'lucide-react';
 
 const AdminDashboard = () => {
   const { user, logout } = useAuth();
+  const { refreshData } = useData();
   const navigate = useNavigate();
+  const [activeSection, setActiveSection] = useState('analytics');
+
+  // Refresh data when component mounts
+  useEffect(() => {
+    refreshData();
+  }, [refreshData]);
 
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
 
-  return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b bg-card">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-primary rounded-xl">
-                <LayoutDashboard className="w-6 h-6 text-primary-foreground" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold">Admin Dashboard</h1>
-                <p className="text-sm text-muted-foreground">Welcome, {user?.email}</p>
-              </div>
-            </div>
-            <Button onClick={handleLogout} variant="outline" className="gap-2">
-              <LogOut className="w-4 h-4" />
-              Logout
-            </Button>
-          </div>
-        </div>
-      </header>
+  const renderActiveSection = () => {
+    switch (activeSection) {
+      case 'analytics':
+        return <ExpenseAnalytics />;
+      case 'expenses':
+        return <AllExpensesTableEnhanced />;
+      case 'users':
+        return <UserManagement />;
+      default:
+        return <ExpenseAnalytics />;
+    }
+  };
 
-      <main className="container mx-auto px-4 py-8">
-        <Tabs defaultValue="analytics" className="space-y-6">
-          <TabsList className="grid w-full max-w-md grid-cols-3">
-            <TabsTrigger value="analytics" className="gap-2">
-              <BarChart3 className="w-4 h-4" />
-              Analytics
-            </TabsTrigger>
-            <TabsTrigger value="expenses" className="gap-2">
-              <Receipt className="w-4 h-4" />
-              Expenses
-            </TabsTrigger>
-            <TabsTrigger value="users" className="gap-2">
-              <Users className="w-4 h-4" />
-              Users
-            </TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="analytics">
-            <ExpenseAnalytics />
-          </TabsContent>
-          
-          <TabsContent value="expenses">
-            <AllExpensesTableEnhanced />
-          </TabsContent>
-          
-          <TabsContent value="users">
-            <UserManagement />
-          </TabsContent>
-        </Tabs>
-      </main>
-    </div>
+  return (
+    <SidebarProvider>
+      <div className="flex h-screen w-full">
+        <Sidebar>
+          <SidebarContent>
+            <SidebarGroup>
+              <SidebarGroupLabel>Admin Dashboard</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      isActive={activeSection === 'analytics'}
+                      onClick={() => setActiveSection('analytics')}
+                    >
+                      <BarChart3 className="w-4 h-4" />
+                      <span>Analytics</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      isActive={activeSection === 'expenses'}
+                      onClick={() => setActiveSection('expenses')}
+                    >
+                      <Receipt className="w-4 h-4" />
+                      <span>Expenses</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      isActive={activeSection === 'users'}
+                      onClick={() => setActiveSection('users')}
+                    >
+                      <Users className="w-4 h-4" />
+                      <span>Users</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          </SidebarContent>
+        </Sidebar>
+        
+        <div className="flex flex-1 flex-col">
+          <header className="border-b bg-card">
+            <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <SidebarTrigger />
+                <div className="p-2 bg-primary rounded-xl">
+                  <LayoutDashboard className="w-6 h-6 text-primary-foreground" />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold">Admin Dashboard</h1>
+                  <p className="text-sm text-muted-foreground">Welcome, {user?.email}</p>
+                </div>
+              </div>
+              <Button onClick={handleLogout} variant="outline" className="gap-2">
+                <LogOut className="w-4 h-4" />
+                Logout
+              </Button>
+            </div>
+          </header>
+
+          <main className="flex-1 overflow-auto p-6">
+            {renderActiveSection()}
+          </main>
+        </div>
+      </div>
+    </SidebarProvider>
   );
 };
 

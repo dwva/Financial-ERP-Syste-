@@ -1,13 +1,28 @@
+import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useData } from '@/contexts/DataContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Receipt, FileText, Image as ImageIcon } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { 
+  AlertDialog, 
+  AlertDialogAction, 
+  AlertDialogCancel, 
+  AlertDialogContent, 
+  AlertDialogDescription, 
+  AlertDialogFooter, 
+  AlertDialogHeader, 
+  AlertDialogTitle 
+} from '@/components/ui/alert-dialog';
+import { Receipt, FileText, Image as ImageIcon, Trash2 } from 'lucide-react';
+import { toast } from 'react-toastify';
 
 const MyExpensesTable = () => {
   const { user } = useAuth();
-  const { expenses } = useData();
+  const { expenses, deleteExpense } = useData();
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [expenseToDelete, setExpenseToDelete] = useState<string | null>(null);
 
   const userExpenses = expenses.filter((expense) => expense.userId === user?.email);
 
@@ -18,13 +33,34 @@ const MyExpensesTable = () => {
   };
 
   const formatAmount = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
+    return new Intl.NumberFormat('en-IN', {
       style: 'currency',
-      currency: 'USD',
+      currency: 'INR',
+      minimumFractionDigits: 2,
     }).format(amount);
   };
 
   const totalExpenses = userExpenses.reduce((sum, expense) => sum + expense.amount, 0);
+
+  const handleDeleteClick = (expenseId: string) => {
+    setExpenseToDelete(expenseId);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (expenseToDelete) {
+      try {
+        await deleteExpense(expenseToDelete);
+        toast.success('Expense deleted successfully!');
+      } catch (error) {
+        console.error('Error deleting expense:', error);
+        toast.error('Failed to delete expense. Please try again.');
+      } finally {
+        setDeleteDialogOpen(false);
+        setExpenseToDelete(null);
+      }
+    }
+  };
 
   return (
     <Card>
@@ -52,14 +88,17 @@ const MyExpensesTable = () => {
               <TableRow>
                 <TableHead>Amount</TableHead>
                 <TableHead>Description</TableHead>
+                <TableHead>Company</TableHead>
+                <TableHead>Sector</TableHead>
                 <TableHead>File</TableHead>
                 <TableHead>Date</TableHead>
+                <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {userExpenses.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                     No expenses recorded yet. Add your first expense above!
                   </TableCell>
                 </TableRow>
@@ -72,6 +111,8 @@ const MyExpensesTable = () => {
                       </Badge>
                     </TableCell>
                     <TableCell>{expense.description}</TableCell>
+                    <TableCell>{expense.company}</TableCell>
+                    <TableCell>{expense.sector}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         {getFileIcon(expense.fileName)}
@@ -81,7 +122,18 @@ const MyExpensesTable = () => {
                       </div>
                     </TableCell>
                     <TableCell className="text-muted-foreground">
-                      {new Date(expense.timestamp).toLocaleDateString()}
+                      {new Date(expense.date).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => handleDeleteClick(expense.id)}
+                        className="gap-2"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        Delete
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))
@@ -90,6 +142,24 @@ const MyExpensesTable = () => {
           </Table>
         </div>
       </CardContent>
+      
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete your expense record.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 };

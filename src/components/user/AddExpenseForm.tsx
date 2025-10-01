@@ -6,16 +6,33 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { toast } from 'react-toastify';
-import { PlusCircle, Upload, X, FileText, Image as ImageIcon } from 'lucide-react';
+import { PlusCircle, Upload, X, FileText, Image as ImageIcon, Calendar } from 'lucide-react';
 
 const AddExpenseForm = () => {
   const { user } = useAuth();
-  const { addExpense } = useData();
+  const { addExpense, refreshData, employees } = useData();
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
+  const [date, setDate] = useState('');
+  const [company, setCompany] = useState('');
+  const [sector, setSector] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [filePreview, setFilePreview] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  // Get current user data
+  const currentUser = employees.find(emp => emp.email === user?.email);
+
+  console.log('Current user from AuthContext:', user);
+  console.log('Current user from DataContext:', currentUser);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -40,24 +57,66 @@ const AddExpenseForm = () => {
     setFilePreview(null);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!user) return;
+    if (!user) {
+      toast.error('User not authenticated');
+      return;
+    }
+    
+    if (!amount || !date || !company || !sector || !description) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+    
+    setLoading(true);
+    
+    try {
+      // Convert file to base64 if it exists
+      let fileBase64 = null;
+      if (file) {
+        fileBase64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+      }
 
-    addExpense({
-      userId: user.email,
-      amount: parseFloat(amount),
-      description,
-      file: filePreview,
-      fileName: file?.name || null,
-    });
+      // Create expense object with correct properties
+      const expenseData = {
+        userId: user.email || '',
+        amount: parseFloat(amount),
+        description,
+        date,
+        company,
+        sector,
+        file: fileBase64,
+        fileName: file?.name || null,
+      };
 
-    toast.success('Expense added successfully!');
-    setAmount('');
-    setDescription('');
-    setFile(null);
-    setFilePreview(null);
+      console.log('Submitting expense data:', expenseData);
+      
+      await addExpense(expenseData);
+
+      toast.success('Expense added successfully!');
+      setAmount('');
+      setDescription('');
+      setDate('');
+      setCompany('');
+      setSector('');
+      setFile(null);
+      setFilePreview(null);
+      
+      // Refresh data to show the new expense
+      await refreshData();
+    } catch (error: any) {
+      console.error('Error adding expense:', error);
+      toast.error(`Failed to add expense: ${error.message || 'Please try again'}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -77,7 +136,7 @@ const AddExpenseForm = () => {
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="grid gap-5 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="amount">Amount (USD)</Label>
+              <Label htmlFor="amount">Amount (₹)</Label>
               <Input
                 id="amount"
                 type="number"
@@ -90,18 +149,63 @@ const AddExpenseForm = () => {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="file">Receipt/Document</Label>
+              <Label htmlFor="date">Date</Label>
               <div className="relative">
                 <Input
-                  id="file"
-                  type="file"
-                  accept="image/*,.pdf"
-                  onChange={handleFileChange}
+                  id="date"
+                  type="date"
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  required
                   className="h-11"
                 />
-                <Upload className="absolute right-3 top-3 h-5 w-5 text-muted-foreground pointer-events-none" />
+                <Calendar className="absolute right-3 top-3 h-5 w-5 text-muted-foreground pointer-events-none" />
               </div>
             </div>
+          </div>
+          
+          <div className="grid gap-5 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="company">Company</Label>
+              <Input
+                id="company"
+                type="text"
+                placeholder="Enter company name"
+                value={company}
+                onChange={(e) => setCompany(e.target.value)}
+                required
+                className="h-11"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="sector">Sector</Label>
+              <Input
+                id="sector"
+                type="text"
+                placeholder="Enter sector"
+                value={sector}
+                onChange={(e) => setSector(e.target.value)}
+                required
+                className="h-11"
+              />
+            </div>
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="status">User Status</Label>
+            <Select value={currentUser?.status || 'employee'} disabled>
+              <SelectTrigger className="h-11">
+                <SelectValue placeholder="Select user status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="employee">Employee</SelectItem>
+                <SelectItem value="founder">Founder</SelectItem>
+                <SelectItem value="manager">Manager</SelectItem>
+                <SelectItem value="intern">Intern</SelectItem>
+                <SelectItem value="admin">Admin</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-sm text-muted-foreground">Status is managed in your profile settings</p>
           </div>
           
           <div className="space-y-2">
@@ -114,6 +218,20 @@ const AddExpenseForm = () => {
               required
               rows={3}
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="file">Receipt/Document</Label>
+            <div className="relative">
+              <Input
+                id="file"
+                type="file"
+                accept="image/*,.pdf"
+                onChange={handleFileChange}
+                className="h-11"
+              />
+              <Upload className="absolute right-3 top-3 h-5 w-5 text-muted-foreground pointer-events-none" />
+            </div>
           </div>
 
           {file && (
@@ -149,8 +267,8 @@ const AddExpenseForm = () => {
             </div>
           )}
 
-          <Button type="submit" className="w-full h-11 text-base font-medium">
-            Submit Expense
+          <Button type="submit" className="w-full h-11 text-base font-medium" disabled={loading}>
+            {loading ? 'Submitting...' : 'Submit Expense'}
           </Button>
         </form>
       </CardContent>
