@@ -15,14 +15,18 @@ import {
   AlertDialogHeader, 
   AlertDialogTitle 
 } from '@/components/ui/alert-dialog';
-import { Receipt, FileText, Image as ImageIcon, Trash2 } from 'lucide-react';
+import { Receipt, FileText, Image as ImageIcon, Trash2, Edit, Eye } from 'lucide-react';
 import { toast } from 'react-toastify';
+import EditExpenseForm from '@/components/user/EditExpenseForm';
 
 const MyExpensesTable = () => {
   const { user } = useAuth();
   const { expenses, deleteExpense } = useData();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [expenseToDelete, setExpenseToDelete] = useState<string | null>(null);
+  const [editingExpense, setEditingExpense] = useState<any | null>(null);
+  const [viewExpenseDialogOpen, setViewExpenseDialogOpen] = useState(false);
+  const [selectedExpense, setSelectedExpense] = useState<any>(null);
 
   const userExpenses = expenses.filter((expense) => expense.userId === user?.email);
 
@@ -86,6 +90,7 @@ const MyExpensesTable = () => {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>ID</TableHead>
                 <TableHead>Amount</TableHead>
                 <TableHead>Description</TableHead>
                 <TableHead>Company</TableHead>
@@ -98,13 +103,16 @@ const MyExpensesTable = () => {
             <TableBody>
               {userExpenses.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                     No expenses recorded yet. Add your first expense above!
                   </TableCell>
                 </TableRow>
               ) : (
                 userExpenses.map((expense) => (
                   <TableRow key={expense.id}>
+                    <TableCell className="font-mono text-xs">
+                      {expense.id.substring(0, 6)}...
+                    </TableCell>
                     <TableCell>
                       <Badge variant="secondary" className="font-semibold">
                         {formatAmount(expense.amount)}
@@ -124,16 +132,39 @@ const MyExpensesTable = () => {
                     <TableCell className="text-muted-foreground">
                       {new Date(expense.date).toLocaleDateString()}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="flex gap-2">
                       <Button
-                        variant="destructive"
+                        variant="outline"
                         size="sm"
-                        onClick={() => handleDeleteClick(expense.id)}
+                        onClick={() => setEditingExpense(expense)}
                         className="gap-2"
                       >
-                        <Trash2 className="w-4 h-4" />
-                        Delete
+                        <Edit className="w-4 h-4" />
+                        Edit
                       </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedExpense(expense);
+                          setViewExpenseDialogOpen(true);
+                        }}
+                        className="gap-2"
+                      >
+                        <Eye className="w-4 h-4" />
+                        View
+                      </Button>
+                      {user?.role === 'admin' && (
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => handleDeleteClick(expense.id)}
+                          className="gap-2"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          Delete
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))
@@ -142,6 +173,84 @@ const MyExpensesTable = () => {
           </Table>
         </div>
       </CardContent>
+      
+      {editingExpense && (
+        <div className="mt-6">
+          <EditExpenseForm 
+            expense={editingExpense} 
+            onCancel={() => setEditingExpense(null)}
+            onSave={() => setEditingExpense(null)}
+          />
+        </div>
+      )}
+      
+      {/* View Expense Dialog */}
+      <AlertDialog open={viewExpenseDialogOpen} onOpenChange={setViewExpenseDialogOpen}>
+        <AlertDialogContent className="max-w-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Expense Details</AlertDialogTitle>
+            <AlertDialogDescription>
+              Full details of your expense
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {selectedExpense && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Amount</p>
+                  <p className="font-medium">{formatAmount(selectedExpense.amount)}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Date</p>
+                  <p className="font-medium">{new Date(selectedExpense.date).toLocaleDateString()}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Company</p>
+                  <p className="font-medium">{selectedExpense.company || 'N/A'}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Sector</p>
+                  <p className="font-medium">{selectedExpense.sector || 'N/A'}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">ID</p>
+                  <p className="font-mono text-sm">{selectedExpense.id}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Status</p>
+                  <p className="font-medium">{selectedExpense.status || 'Pending'}</p>
+                </div>
+              </div>
+              
+              <div>
+                <p className="text-sm text-muted-foreground">Description</p>
+                <p className="font-medium">{selectedExpense.description}</p>
+              </div>
+              
+              {selectedExpense.file && (
+                <div>
+                  <p className="text-sm text-muted-foreground mb-2">Receipt/Document</p>
+                  {selectedExpense.fileName?.match(/\.(jpg|jpeg|png|gif)$/i) ? (
+                    <img 
+                      src={selectedExpense.file} 
+                      alt="Receipt" 
+                      className="max-w-full h-auto rounded-lg border"
+                    />
+                  ) : (
+                    <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
+                      <FileText className="w-5 h-5" />
+                      <span>{selectedExpense.fileName}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel>Close</AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>

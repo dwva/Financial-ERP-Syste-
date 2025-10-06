@@ -6,10 +6,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'react-toastify';
-import { Lock, Mail } from 'lucide-react';
+import { Lock, Mail, Phone, User } from 'lucide-react';
 
 const Login = () => {
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
@@ -20,28 +20,28 @@ const Login = () => {
     setLoading(true);
     
     try {
-      const success = await login(email, password);
+      const success = await login(identifier, password);
       if (success) {
         // Check if it's an admin
-        if (email === 'admin@company.com' || email === 'adminxyz@gmail.com') {
+        if (identifier === 'admin@company.com' || identifier === 'adminxyz@gmail.com') {
           navigate('/admin');
         } else {
           navigate('/dashboard');
         }
         toast.success('Login successful!');
       } else {
-        toast.error('Invalid credentials. Please check your email and password.');
+        toast.error('Invalid credentials. Please check your identifier and password.');
       }
     } catch (error: any) {
       console.error('Login error:', error);
       let errorMessage = 'Login failed. Please try again.';
       
       if (error.code === 'auth/user-not-found') {
-        errorMessage = 'No user found with this email.';
+        errorMessage = 'No user found with this identifier.';
       } else if (error.code === 'auth/wrong-password') {
         errorMessage = 'Incorrect password.';
       } else if (error.code === 'auth/invalid-email') {
-        errorMessage = 'Invalid email format.';
+        errorMessage = 'Invalid identifier format.';
       }
       
       toast.error(errorMessage);
@@ -61,21 +61,23 @@ const Login = () => {
           </div>
           <CardTitle className="text-2xl text-center">Financial ERP System</CardTitle>
           <CardDescription className="text-center">
-            Enter your credentials to access your account
+            Sign in to your account
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="identifier">Email, Mobile Number, or Username</Label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <div className="absolute left-3 top-1/2 transform -translate-y-1/2 flex items-center">
+                  <Mail className="w-4 h-4 text-muted-foreground" />
+                </div>
                 <Input
-                  id="email"
-                  type="email"
-                  placeholder="user@company.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  id="identifier"
+                  type="text"
+                  placeholder="Email, mobile number, or username"
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
                   className="pl-10"
                   required
                 />
@@ -83,14 +85,20 @@ const Login = () => {
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
+              <div className="relative">
+                <div className="absolute left-3 top-1/2 transform -translate-y-1/2 flex items-center">
+                  <Lock className="w-4 h-4 text-muted-foreground" />
+                </div>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="pl-10"
+                  required
+                />
+              </div>
             </div>
           </CardContent>
           <CardFooter className="flex flex-col space-y-4">

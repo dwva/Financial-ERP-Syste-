@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { DataProvider } from "@/contexts/DataContext";
+import { NotificationProvider } from "@/contexts/NotificationContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Login from "./pages/Login";
 import AdminDashboard from "./pages/AdminDashboard";
@@ -33,27 +34,29 @@ const App = () => (
       <BrowserRouter>
         <DataProvider>
           <AuthProvider>
-            <Routes>
-              <Route path="/login" element={<Login />} />
-              <Route
-                path="/admin"
-                element={
-                  <ProtectedRoute requiredRole="admin">
-                    <AdminDashboard />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/dashboard"
-                element={
-                  <ProtectedRoute requiredRole="user">
-                    <UserDashboard />
-                  </ProtectedRoute>
-                }
-              />
-              <Route path="/" element={<Navigate to="/login" replace />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
+            <NotificationProvider>
+              <Routes>
+                <Route path="/login" element={<Login />} />
+                <Route
+                  path="/admin"
+                  element={
+                    <ProtectedRoute requiredRole="admin">
+                      <AdminDashboard />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/dashboard"
+                  element={
+                    <ProtectedRoute requiredRole="user">
+                      <UserDashboard />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route path="/" element={<Navigate to="/login" replace />} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </NotificationProvider>
           </AuthProvider>
         </DataProvider>
       </BrowserRouter>

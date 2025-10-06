@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/select';
 import AddExpenseForm from '@/components/user/AddExpenseForm';
 import MyExpensesTable from '@/components/user/MyExpensesTable';
-import { LogOut, Wallet, User, Calendar, Building, Hash } from 'lucide-react';
+import { LogOut, Wallet, User, Calendar, Building, Hash, Camera } from 'lucide-react';
 
 const UserDashboard = () => {
   const { user, logout } = useAuth();
@@ -27,6 +27,8 @@ const UserDashboard = () => {
   const [sector, setSector] = useState('');
   const [age, setAge] = useState('');
   const [status, setStatus] = useState<'employee' | 'founder' | 'manager' | 'intern' | 'admin'>('employee');
+  const [profilePicture, setProfilePicture] = useState<string>('');
+  const [profilePictureFile, setProfilePictureFile] = useState<File | null>(null);
 
   // Get current user data
   const currentUser = employees.find(emp => emp.email === user?.email);
@@ -38,6 +40,7 @@ const UserDashboard = () => {
       setSector(currentUser.sector || '');
       setAge(currentUser.age?.toString() || '');
       setStatus(currentUser.status || 'employee');
+      setProfilePicture(currentUser.profilePicture || '');
     }
   }, [currentUser]);
 
@@ -51,16 +54,35 @@ const UserDashboard = () => {
     navigate('/login');
   };
 
+  const handleProfilePictureChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setProfilePictureFile(file);
+      
+      // Preview the image
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target?.result) {
+          setProfilePicture(event.target.result as string);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleProfileUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (currentUser) {
       try {
+        // For now, we'll just store the image as a base64 string
+        // In a production app, you would upload to a storage service like Firebase Storage
         await updateEmployee({
           ...currentUser,
           name,
           sector,
           age: age ? parseInt(age) : undefined,
-          status
+          status,
+          profilePicture
         });
         setIsProfileOpen(false);
       } catch (error) {
@@ -94,7 +116,7 @@ const UserDashboard = () => {
                 <DialogTrigger asChild>
                   <Button variant="ghost" className="relative h-10 w-10 rounded-full p-0">
                     <Avatar className="h-10 w-10">
-                      <AvatarImage src="" alt={user?.email || ''} />
+                      <AvatarImage src={profilePicture || ''} alt={user?.email || ''} />
                       <AvatarFallback>{getUserInitials(user?.email)}</AvatarFallback>
                     </Avatar>
                   </Button>
@@ -107,6 +129,38 @@ const UserDashboard = () => {
                     </DialogTitle>
                   </DialogHeader>
                   <form onSubmit={handleProfileUpdate} className="space-y-4">
+                    <div className="flex flex-col items-center gap-4">
+                      <div className="relative">
+                        <Avatar className="h-24 w-24">
+                          <AvatarImage src={profilePicture || ''} alt="Profile" />
+                          <AvatarFallback className="text-2xl">
+                            {name ? name.charAt(0).toUpperCase() : getUserInitials(user?.email)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <label 
+                          htmlFor="profile-picture" 
+                          className="absolute bottom-0 right-0 bg-primary rounded-full p-2 cursor-pointer hover:bg-primary/90 transition-colors"
+                        >
+                          <Camera className="h-4 w-4 text-primary-foreground" />
+                        </label>
+                      </div>
+                      <Input
+                        id="profile-picture"
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleProfilePictureChange}
+                      />
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => document.getElementById('profile-picture')?.click()}
+                      >
+                        Change Photo
+                      </Button>
+                    </div>
+                    
                     <div className="space-y-2">
                       <Label htmlFor="name">Name</Label>
                       <div className="relative">

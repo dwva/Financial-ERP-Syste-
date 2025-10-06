@@ -24,8 +24,9 @@ import {
   AlertDialogHeader, 
   AlertDialogTitle 
 } from '@/components/ui/alert-dialog';
-import { Receipt, FileText, Image as ImageIcon, Search, ArrowUpDown, Filter, Trash2, PlusCircle } from 'lucide-react';
+import { Receipt, FileText, Image as ImageIcon, Search, ArrowUpDown, Filter, Trash2, PlusCircle, Edit, Eye, ChevronDown, ChevronRight } from 'lucide-react';
 import { toast } from 'react-toastify';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 // Add this interface for the expense form
 interface ExpenseForm {
@@ -52,6 +53,9 @@ const AllExpensesTableEnhanced = () => {
   const [expenseToDelete, setExpenseToDelete] = useState<string | null>(null);
   const [isAddExpenseDialogOpen, setIsAddExpenseDialogOpen] = useState(false);
   const [deleteUserDialogOpen, setDeleteUserDialogOpen] = useState(false);
+  const [isViewExpenseDialogOpen, setIsViewExpenseDialogOpen] = useState(false);
+  const [selectedExpense, setSelectedExpense] = useState<any>(null);
+  const [expandedCompanies, setExpandedCompanies] = useState<Record<string, boolean>>({});
   const [newExpense, setNewExpense] = useState<ExpenseForm>({
     userId: '',
     amount: '',
@@ -140,6 +144,21 @@ const AllExpensesTableEnhanced = () => {
     return filtered;
   }, [expenses, searchTerm, filterEmployee, filterMonth, filterYear, sortField, sortOrder]);
 
+  // Group expenses by company
+  const groupedExpenses = useMemo(() => {
+    const groups: Record<string, any[]> = {};
+    
+    filteredAndSortedExpenses.forEach(expense => {
+      const company = expense.company || 'Unknown Company';
+      if (!groups[company]) {
+        groups[company] = [];
+      }
+      groups[company].push(expense);
+    });
+    
+    return groups;
+  }, [filteredAndSortedExpenses]);
+
   const toggleSort = (field: SortField) => {
     if (sortField === field) {
       setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
@@ -147,6 +166,13 @@ const AllExpensesTableEnhanced = () => {
       setSortField(field);
       setSortOrder('asc');
     }
+  };
+
+  const toggleCompanyExpansion = (company: string) => {
+    setExpandedCompanies(prev => ({
+      ...prev,
+      [company]: !prev[company]
+    }));
   };
 
   const getFileIcon = (fileName: string | null) => {
@@ -225,6 +251,19 @@ const AllExpensesTableEnhanced = () => {
       console.error('Error adding expense:', error);
       toast.error('Failed to add expense. Please try again.');
     }
+  };
+
+  const handleViewExpense = (expense: any) => {
+    setSelectedExpense(expense);
+    setIsViewExpenseDialogOpen(true);
+  };
+
+  const getUserInitials = (name: string | undefined, email: string) => {
+    if (name && name.trim() !== '') {
+      return name.substring(0, 2).toUpperCase();
+    }
+    const [emailName] = email.split('@');
+    return emailName.substring(0, 2).toUpperCase();
   };
 
   return (
@@ -321,6 +360,7 @@ const AllExpensesTableEnhanced = () => {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>Profile</TableHead>
                 <TableHead>
                   <Button
                     variant="ghost"
@@ -372,47 +412,105 @@ const AllExpensesTableEnhanced = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredAndSortedExpenses.length === 0 ? (
+              {Object.keys(groupedExpenses).length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
                     No expenses found
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredAndSortedExpenses.map((expense) => (
-                  <TableRow key={expense.id}>
-                    <TableCell className="font-medium">{expense.userId.split('@')[0]}</TableCell>
-                    <TableCell>
-                      <Badge variant="secondary" className="font-semibold">
-                        {formatAmount(expense.amount)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{expense.description}</TableCell>
-                    <TableCell>{expense.company || 'N/A'}</TableCell>
-                    <TableCell>{expense.sector || 'N/A'}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        {getFileIcon(expense.fileName)}
-                        <span className="text-sm text-muted-foreground">
-                          {expense.fileName || 'No file'}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {new Date(expense.timestamp).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => handleDeleteClick(expense.id)}
-                        className="gap-2"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                        Delete
-                      </Button>
-                    </TableCell>
-                  </TableRow>
+                Object.entries(groupedExpenses).map(([company, companyExpenses]) => (
+                  <>
+                    {/* Company Group Header */}
+                    <TableRow key={company} className="bg-muted/50">
+                      <TableCell colSpan={9} className="font-bold py-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => toggleCompanyExpansion(company)}
+                              className="p-1 h-6 w-6 mr-2"
+                            >
+                              {expandedCompanies[company] ? (
+                                <ChevronDown className="w-4 h-4" />
+                              ) : (
+                                <ChevronRight className="w-4 h-4" />
+                              )}
+                            </Button>
+                            <span>{company}</span>
+                            <Badge variant="secondary" className="ml-2">
+                              {companyExpenses.length} expenses
+                            </Badge>
+                          </div>
+                          <div className="text-right">
+                            <Badge variant="outline">
+                              Total: {formatAmount(companyExpenses.reduce((sum, exp) => sum + exp.amount, 0))}
+                            </Badge>
+                          </div>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                    
+                    {/* Company Expenses */}
+                    {expandedCompanies[company] && companyExpenses.map((expense) => {
+                      const employee = employees.find(emp => emp.email === expense.userId);
+                      return (
+                        <TableRow key={expense.id}>
+                          <TableCell className="pl-8">
+                            <Avatar className="h-8 w-8">
+                              <AvatarImage src={employee?.profilePicture || ''} alt={employee?.name || expense.userId} />
+                              <AvatarFallback>
+                                {getUserInitials(employee?.name, expense.userId)}
+                              </AvatarFallback>
+                            </Avatar>
+                          </TableCell>
+                          <TableCell className="font-medium">
+                            {employee?.name || expense.userId.split('@')[0]}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="secondary" className="font-semibold">
+                              {formatAmount(expense.amount)}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{expense.description}</TableCell>
+                          <TableCell>{expense.company || 'N/A'}</TableCell>
+                          <TableCell>{expense.sector || 'N/A'}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              {getFileIcon(expense.fileName)}
+                              <span className="text-sm text-muted-foreground">
+                                {expense.fileName || 'No file'}
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {new Date(expense.timestamp).toLocaleDateString()}
+                          </TableCell>
+                          <TableCell className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleViewExpense(expense)}
+                              className="gap-2"
+                            >
+                              <Eye className="w-4 h-4" />
+                              View
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => handleDeleteClick(expense.id)}
+                              className="gap-2"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                              Delete
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </>
                 ))
               )}
             </TableBody>
@@ -523,6 +621,93 @@ const AllExpensesTableEnhanced = () => {
             </Button>
             <Button onClick={handleAddExpense}>
               Add Expense
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* View Expense Dialog */}
+      <Dialog open={isViewExpenseDialogOpen} onOpenChange={setIsViewExpenseDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Expense Details</DialogTitle>
+            <DialogDescription>
+              Full details of the expense
+            </DialogDescription>
+          </DialogHeader>
+          {selectedExpense && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Employee</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    {(() => {
+                      const employee = employees.find(emp => emp.email === selectedExpense.userId);
+                      return (
+                        <>
+                          <Avatar className="h-8 w-8">
+                            <AvatarImage src={employee?.profilePicture || ''} alt={employee?.name || selectedExpense.userId} />
+                            <AvatarFallback>
+                              {getUserInitials(employee?.name, selectedExpense.userId)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span className="font-medium">
+                            {employee?.name || selectedExpense.userId}
+                          </span>
+                        </>
+                      );
+                    })()}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Amount</p>
+                  <p className="font-medium">{formatAmount(selectedExpense.amount)}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Date</p>
+                  <p className="font-medium">{new Date(selectedExpense.timestamp).toLocaleDateString()}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Company</p>
+                  <p className="font-medium">{selectedExpense.company || 'N/A'}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Sector</p>
+                  <p className="font-medium">{selectedExpense.sector || 'N/A'}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Status</p>
+                  <p className="font-medium">{selectedExpense.status || 'Pending'}</p>
+                </div>
+              </div>
+              
+              <div>
+                <p className="text-sm text-muted-foreground">Description</p>
+                <p className="font-medium">{selectedExpense.description}</p>
+              </div>
+              
+              {selectedExpense.file && (
+                <div>
+                  <p className="text-sm text-muted-foreground mb-2">Receipt/Document</p>
+                  {selectedExpense.fileName?.match(/\.(jpg|jpeg|png|gif)$/i) ? (
+                    <img 
+                      src={selectedExpense.file} 
+                      alt="Receipt" 
+                      className="max-w-full h-auto rounded-lg border"
+                    />
+                  ) : (
+                    <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
+                      <FileText className="w-5 h-5" />
+                      <span>{selectedExpense.fileName}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button onClick={() => setIsViewExpenseDialogOpen(false)}>
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>
