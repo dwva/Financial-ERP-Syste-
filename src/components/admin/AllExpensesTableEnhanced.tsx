@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 import { useData } from '@/contexts/DataContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -35,6 +36,7 @@ interface ExpenseForm {
   description: string;
   date: string;
   company: string;
+  clientName: string;
   sector: string;
 }
 
@@ -42,6 +44,7 @@ type SortField = 'employee' | 'amount' | 'date' | 'description';
 type SortOrder = 'asc' | 'desc';
 
 const AllExpensesTableEnhanced = () => {
+  const { user: currentUser } = useAuth();
   const { expenses, employees, deleteExpense, addExpense } = useData();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterEmployee, setFilterEmployee] = useState<string>('all');
@@ -55,15 +58,26 @@ const AllExpensesTableEnhanced = () => {
   const [deleteUserDialogOpen, setDeleteUserDialogOpen] = useState(false);
   const [isViewExpenseDialogOpen, setIsViewExpenseDialogOpen] = useState(false);
   const [selectedExpense, setSelectedExpense] = useState<any>(null);
-  const [expandedCompanies, setExpandedCompanies] = useState<Record<string, boolean>>({});
+  const [expandedClients, setExpandedClients] = useState<Record<string, boolean>>({});
   const [newExpense, setNewExpense] = useState<ExpenseForm>({
     userId: '',
     amount: '',
     description: '',
     date: '',
     company: '',
+    clientName: '',
     sector: ''
   });
+
+  // Set default employee to current admin user when dialog opens
+  useEffect(() => {
+    if (isAddExpenseDialogOpen && currentUser?.email) {
+      setNewExpense(prev => ({
+        ...prev,
+        userId: currentUser.email || ''
+      }));
+    }
+  }, [isAddExpenseDialogOpen, currentUser]);
 
   // Get unique months and years from expenses
   const uniqueMonths = useMemo(() => {
@@ -96,6 +110,7 @@ const AllExpensesTableEnhanced = () => {
           expense.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
           expense.userId.toLowerCase().includes(searchTerm.toLowerCase()) ||
           expense.company?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          expense.clientName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
           expense.sector?.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
@@ -144,16 +159,16 @@ const AllExpensesTableEnhanced = () => {
     return filtered;
   }, [expenses, searchTerm, filterEmployee, filterMonth, filterYear, sortField, sortOrder]);
 
-  // Group expenses by company
+  // Group expenses by client name
   const groupedExpenses = useMemo(() => {
     const groups: Record<string, any[]> = {};
     
     filteredAndSortedExpenses.forEach(expense => {
-      const company = expense.company || 'Unknown Company';
-      if (!groups[company]) {
-        groups[company] = [];
+      const clientName = expense.clientName || 'Unknown Client';
+      if (!groups[clientName]) {
+        groups[clientName] = [];
       }
-      groups[company].push(expense);
+      groups[clientName].push(expense);
     });
     
     return groups;
@@ -168,10 +183,10 @@ const AllExpensesTableEnhanced = () => {
     }
   };
 
-  const toggleCompanyExpansion = (company: string) => {
-    setExpandedCompanies(prev => ({
+  const toggleClientExpansion = (clientName: string) => {
+    setExpandedClients(prev => ({
       ...prev,
-      [company]: !prev[company]
+      [clientName]: !prev[clientName]
     }));
   };
 
@@ -218,20 +233,29 @@ const AllExpensesTableEnhanced = () => {
   };
 
   const handleAddExpense = async () => {
-    if (!newExpense.userId || !newExpense.amount || !newExpense.description || !newExpense.date) {
+    if (!newExpense.amount || !newExpense.description || !newExpense.date || !newExpense.clientName) {
       toast.error('Please fill in all required fields');
+      return;
+    }
+    
+    // Use current user's email if no user is selected
+    const userId = newExpense.userId || currentUser?.email || '';
+    
+    if (!userId) {
+      toast.error('Please select an employee or ensure you are logged in');
       return;
     }
     
     try {
       const expenseData = {
-        userId: newExpense.userId,
+        userId,
         amount: parseFloat(newExpense.amount),
         description: newExpense.description,
         file: null,
         fileName: null,
         date: newExpense.date,
         company: newExpense.company || '',
+        clientName: newExpense.clientName || '',
         sector: newExpense.sector || '',
         timestamp: new Date().toISOString()
       };
@@ -244,6 +268,7 @@ const AllExpensesTableEnhanced = () => {
         description: '',
         date: '',
         company: '',
+        clientName: '',
         sector: ''
       });
       toast.success('Expense added successfully!');
@@ -394,7 +419,7 @@ const AllExpensesTableEnhanced = () => {
                     <ArrowUpDown className="w-3 h-3" />
                   </Button>
                 </TableHead>
-                <TableHead>Company</TableHead>
+                <TableHead>Client Name</TableHead>
                 <TableHead>Sector</TableHead>
                 <TableHead>File</TableHead>
                 <TableHead>
@@ -421,7 +446,7 @@ const AllExpensesTableEnhanced = () => {
               ) : (
                 Object.entries(groupedExpenses).map(([company, companyExpenses]) => (
                   <>
-                    {/* Company Group Header */}
+                    {/* Client Group Header */}
                     <TableRow key={company} className="bg-muted/50">
                       <TableCell colSpan={9} className="font-bold py-3">
                         <div className="flex items-center justify-between">
@@ -429,16 +454,16 @@ const AllExpensesTableEnhanced = () => {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => toggleCompanyExpansion(company)}
+                              onClick={() => toggleClientExpansion(company)}
                               className="p-1 h-6 w-6 mr-2"
                             >
-                              {expandedCompanies[company] ? (
+                              {expandedClients[company] ? (
                                 <ChevronDown className="w-4 h-4" />
                               ) : (
                                 <ChevronRight className="w-4 h-4" />
                               )}
                             </Button>
-                            <span>{company}</span>
+                            <span>Client: {company}</span>
                             <Badge variant="secondary" className="ml-2">
                               {companyExpenses.length} expenses
                             </Badge>
@@ -453,7 +478,7 @@ const AllExpensesTableEnhanced = () => {
                     </TableRow>
                     
                     {/* Company Expenses */}
-                    {expandedCompanies[company] && companyExpenses.map((expense) => {
+                    {expandedClients[company] && companyExpenses.map((expense) => {
                       const employee = employees.find(emp => emp.email === expense.userId);
                       return (
                         <TableRow key={expense.id}>
@@ -474,7 +499,7 @@ const AllExpensesTableEnhanced = () => {
                             </Badge>
                           </TableCell>
                           <TableCell>{expense.description}</TableCell>
-                          <TableCell>{expense.company || 'N/A'}</TableCell>
+                          <TableCell>{expense.clientName || 'N/A'}</TableCell>
                           <TableCell>{expense.sector || 'N/A'}</TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2">
@@ -548,7 +573,7 @@ const AllExpensesTableEnhanced = () => {
           <div className="space-y-4">
             <div className="space-y-2">
               <label htmlFor="employee" className="text-sm font-medium">Employee</label>
-              <Select value={newExpense.userId} onValueChange={(value) => setNewExpense({...newExpense, userId: value})}>
+              <Select value={newExpense.userId || currentUser?.email || ''} onValueChange={(value) => setNewExpense({...newExpense, userId: value})}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select employee" />
                 </SelectTrigger>
@@ -595,6 +620,18 @@ const AllExpensesTableEnhanced = () => {
               </div>
               
               <div className="space-y-2">
+                <label htmlFor="clientName" className="text-sm font-medium">Client Name</label>
+                <Input
+                  id="clientName"
+                  placeholder="Client name"
+                  value={newExpense.clientName || ''}
+                  onChange={(e) => setNewExpense({...newExpense, clientName: e.target.value})}
+                />
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
                 <label htmlFor="company" className="text-sm font-medium">Company</label>
                 <Input
                   id="company"
@@ -603,16 +640,16 @@ const AllExpensesTableEnhanced = () => {
                   onChange={(e) => setNewExpense({...newExpense, company: e.target.value})}
                 />
               </div>
-            </div>
-            
-            <div className="space-y-2">
-              <label htmlFor="sector" className="text-sm font-medium">Sector</label>
-              <Input
-                id="sector"
-                placeholder="Sector"
-                value={newExpense.sector}
-                onChange={(e) => setNewExpense({...newExpense, sector: e.target.value})}
-              />
+              
+              <div className="space-y-2">
+                <label htmlFor="sector" className="text-sm font-medium">Sector</label>
+                <Input
+                  id="sector"
+                  placeholder="Sector"
+                  value={newExpense.sector}
+                  onChange={(e) => setNewExpense({...newExpense, sector: e.target.value})}
+                />
+              </div>
             </div>
           </div>
           <DialogFooter>
@@ -666,6 +703,10 @@ const AllExpensesTableEnhanced = () => {
                 <div>
                   <p className="text-sm text-muted-foreground">Date</p>
                   <p className="font-medium">{new Date(selectedExpense.timestamp).toLocaleDateString()}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Client Name</p>
+                  <p className="font-medium">{selectedExpense.clientName || 'N/A'}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Company</p>

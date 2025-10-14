@@ -23,6 +23,7 @@ const AddExpenseForm = () => {
   const [description, setDescription] = useState('');
   const [date, setDate] = useState('');
   const [company, setCompany] = useState('');
+  const [clientName, setClientName] = useState('');
   const [sector, setSector] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [filePreview, setFilePreview] = useState<string | null>(null);
@@ -65,7 +66,7 @@ const AddExpenseForm = () => {
       return;
     }
     
-    if (!amount || !date || !company || !sector || !description) {
+    if (!amount || !date || !company || !clientName || !sector || !description) {
       toast.error('Please fill in all required fields');
       return;
     }
@@ -91,6 +92,7 @@ const AddExpenseForm = () => {
         description,
         date,
         company,
+        clientName,
         sector,
         file: fileBase64,
         fileName: file?.name || null,
@@ -105,6 +107,7 @@ const AddExpenseForm = () => {
       setDescription('');
       setDate('');
       setCompany('');
+      setClientName('');
       setSector('');
       setFile(null);
       setFilePreview(null);
@@ -178,17 +181,30 @@ const AddExpenseForm = () => {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="sector">Sector</Label>
+              <Label htmlFor="clientName">Client Name</Label>
               <Input
-                id="sector"
+                id="clientName"
                 type="text"
-                placeholder="Enter sector"
-                value={sector}
-                onChange={(e) => setSector(e.target.value)}
+                placeholder="Enter client name"
+                value={clientName}
+                onChange={(e) => setClientName(e.target.value)}
                 required
                 className="h-11"
               />
             </div>
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="sector">Sector</Label>
+            <Input
+              id="sector"
+              type="text"
+              placeholder="Enter sector"
+              value={sector}
+              onChange={(e) => setSector(e.target.value)}
+              required
+              className="h-11"
+            />
           </div>
           
           <div className="space-y-2">

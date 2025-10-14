@@ -20,6 +20,7 @@ const employeesCollection = collection(db, 'employees');
 const expensesCollection = collection(db, 'expenses');
 const invoicesCollection = collection(db, 'invoices');
 const serviceChargesCollection = collection(db, 'serviceCharges');
+const invoiceHistoryCollection = collection(db, 'invoiceHistory');
 
 // Authentication operations
 export const createAdminUser = async (email: string, password: string) => {
@@ -341,6 +342,67 @@ export const deleteServiceCharge = async (id: string) => {
     return id;
   } catch (error) {
     console.error('Error deleting service charge:', error);
+    throw error;
+  }
+};
+
+// Invoice History operations
+export const createInvoiceHistory = async (invoice: any) => {
+  try {
+    const docRef = await addDoc(invoiceHistoryCollection, invoice);
+    return { id: docRef.id, ...invoice };
+  } catch (error) {
+    console.error('Error creating invoice history:', error);
+    throw error;
+  }
+};
+
+export const getInvoiceHistory = async () => {
+  try {
+    const querySnapshot = await getDocs(invoiceHistoryCollection);
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...(doc.data() as any)
+    }));
+  } catch (error) {
+    console.error('Error fetching invoice history:', error);
+    throw error;
+  }
+};
+
+export const getInvoiceHistoryById = async (id: string) => {
+  try {
+    const invoiceDoc = doc(db, 'invoiceHistory', id);
+    const docSnap = await getDoc(invoiceDoc);
+    if (docSnap.exists()) {
+      return { id: docSnap.id, ...(docSnap.data() as any) };
+    } else {
+      throw new Error('Invoice history not found');
+    }
+  } catch (error) {
+    console.error('Error fetching invoice history:', error);
+    throw error;
+  }
+};
+
+export const updateInvoiceHistory = async (id: string, invoice: Partial<any>) => {
+  try {
+    const invoiceDoc = doc(db, 'invoiceHistory', id);
+    await updateDoc(invoiceDoc, invoice);
+    return { id, ...invoice };
+  } catch (error) {
+    console.error('Error updating invoice history:', error);
+    throw error;
+  }
+};
+
+export const deleteInvoiceHistory = async (id: string) => {
+  try {
+    const invoiceDoc = doc(db, 'invoiceHistory', id);
+    await deleteDoc(invoiceDoc);
+    return id;
+  } catch (error) {
+    console.error('Error deleting invoice history:', error);
     throw error;
   }
 };

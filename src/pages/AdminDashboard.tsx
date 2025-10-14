@@ -1,58 +1,40 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useData } from '@/contexts/DataContext';
-import { useNotification } from '@/contexts/NotificationContext';
-import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import UserManagement from '@/components/admin/UserManagement';
-import AllExpensesTableEnhanced from '@/components/admin/AllExpensesTableEnhanced';
+import { 
+  LayoutDashboard, 
+  Wallet, 
+  Users, 
+  FileText, 
+  Bell, 
+  Settings, 
+  LogOut,
+  FileSpreadsheet,
+  History
+} from 'lucide-react';
 import FinancialOverview from '@/components/admin/FinancialOverview';
+import AllExpensesTableEnhanced from '@/components/admin/AllExpensesTableEnhanced';
+import UserManagement from '@/components/admin/UserManagement';
 import ExpenseStatus from '@/components/admin/ExpenseStatus';
 import NotificationPage from '@/components/admin/NotificationPage';
 import ServiceCharges from '@/components/admin/ServiceCharges';
 import InvoiceGeneration from '@/components/admin/InvoiceGeneration';
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarProvider,
-  SidebarTrigger,
-} from '@/components/ui/sidebar';
-import {
-  LogOut,
-  LayoutDashboard,
-  BarChart3,
-  Receipt,
-  Users,
-  Briefcase,
-  Wallet,
-  CheckCircle,
-  Bell,
-  Building,
-  FileText,
-  Calculator
-} from 'lucide-react';
+import InvoiceHistory from '@/components/admin/InvoiceHistory';
+// ExcelImportSection import removed
+import { useNavigate } from 'react-router-dom';
 
 const AdminDashboard = () => {
-  const { user, logout } = useAuth();
-  const { refreshData } = useData();
-  const { unreadCount } = useNotification();
-  const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState('analytics');
+  const { logout } = useAuth();
+  const navigate = useNavigate();
 
-  // Refresh data when component mounts
-  useEffect(() => {
-    refreshData();
-  }, [refreshData]);
-
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/login');
+    } catch (error) {
+      console.error('Failed to logout:', error);
+    }
   };
 
   const renderActiveSection = () => {
@@ -71,148 +53,71 @@ const AdminDashboard = () => {
         return <ServiceCharges />;
       case 'invoice-generation':
         return <InvoiceGeneration />;
+      case 'invoice-history':
+        return <InvoiceHistory />;
+      // Excel import case removed
       default:
         return <FinancialOverview />;
     }
   };
 
-  return (
-    <SidebarProvider>
-      <div className="flex h-screen w-full bg-gray-50">
-        <Sidebar className="border-r border-sidebar-border shadow-lg bg-white">
-          <SidebarContent className="p-4">
-            <SidebarGroup>
-              <SidebarGroupLabel className="mb-4 text-lg font-bold">
-                Financial ERP System
-              </SidebarGroupLabel>
-              <SidebarGroupContent>
-                <SidebarMenu className="space-y-2">
-                  <SidebarMenuItem>
-                    <SidebarMenuButton
-                      isActive={activeSection === 'analytics'}
-                      onClick={() => setActiveSection('analytics')}
-                      size="lg"
-                      className="gap-3"
-                    >
-                      <BarChart3 className="w-5 h-5" />
-                      <span>Financial Overview</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton
-                      isActive={activeSection === 'expenses'}
-                      onClick={() => setActiveSection('expenses')}
-                      size="lg"
-                      className="gap-3"
-                    >
-                      <Receipt className="w-5 h-5" />
-                      <span>Expense Management</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton
-                      isActive={activeSection === 'users'}
-                      onClick={() => setActiveSection('users')}
-                      size="lg"
-                      className="gap-3"
-                    >
-                      <Users className="w-5 h-5" />
-                      <span>User Management</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton
-                      isActive={activeSection === 'service-charges'}
-                      onClick={() => setActiveSection('service-charges')}
-                      size="lg"
-                      className="gap-3"
-                    >
-                      <Calculator className="w-5 h-5" />
-                      <span>Service Charges</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton
-                      isActive={activeSection === 'invoice-generation'}
-                      onClick={() => setActiveSection('invoice-generation')}
-                      size="lg"
-                      className="gap-3"
-                    >
-                      <FileText className="w-5 h-5" />
-                      <span>Invoice Generation</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton
-                      isActive={activeSection === 'expense-status'}
-                      onClick={() => setActiveSection('expense-status')}
-                      size="lg"
-                      className="gap-3"
-                    >
-                      <CheckCircle className="w-5 h-5" />
-                      <span>Expense Status</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton
-                      isActive={activeSection === 'notifications'}
-                      onClick={() => setActiveSection('notifications')}
-                      size="lg"
-                      className="gap-3"
-                    >
-                      <div className="relative">
-                        <Bell className="w-5 h-5" />
-                        {unreadCount > 0 && (
-                          <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                            {unreadCount > 9 ? '9+' : unreadCount}
-                          </span>
-                        )}
-                      </div>
-                      <span>Notifications</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-          </SidebarContent>
-        </Sidebar>
-        
-        <div className="flex flex-1 flex-col">
-          <header className="border-b bg-card shadow-sm">
-            <div className="container mx-auto px-6 py-4 flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <SidebarTrigger className="rounded-lg p-2 hover:bg-secondary" />
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-primary rounded-lg">
-                    <Wallet className="w-6 h-6 text-primary-foreground" />
-                  </div>
-                  <div>
-                    <h1 className="text-2xl font-bold text-gray-800">Financial ERP Dashboard</h1>
-                    <p className="text-sm text-muted-foreground">Welcome, {user?.email}</p>
-                  </div>
-                </div>
-              </div>
-              <Button onClick={handleLogout} variant="outline" className="gap-2 text-base py-2 px-4 rounded-lg">
-                <LogOut className="w-5 h-5" />
-                Logout
-              </Button>
-            </div>
-          </header>
+  const menuItems = [
+    { id: 'analytics', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'expenses', label: 'All Expenses', icon: Wallet },
+    { id: 'users', label: 'User Management', icon: Users },
+    { id: 'expense-status', label: 'Expense Status', icon: FileText },
+    { id: 'notifications', label: 'Notifications', icon: Bell },
+    { id: 'service-charges', label: 'Service Charges', icon: FileSpreadsheet },
+    { id: 'invoice-generation', label: 'Invoice Generation', icon: FileText },
+    { id: 'invoice-history', label: 'Invoice History', icon: History },
+    // Excel import menu item removed
+  ];
 
-          <main className="flex-1 overflow-auto p-6">
-            <div className="max-w-7xl mx-auto">
-              {renderActiveSection()}
-            </div>
-          </main>
-          
-          <footer className="border-t bg-card py-4">
-            <div className="container mx-auto px-6 text-center text-sm text-muted-foreground">
-              © {new Date().getFullYear()} Financial ERP System. All rights reserved.
-            </div>
-          </footer>
+  return (
+    <div className="flex h-screen bg-gray-50">
+      {/* Sidebar */}
+      <div className="w-64 bg-white shadow-md">
+        <div className="p-4 border-b">
+          <h1 className="text-xl font-bold text-gray-800">Admin Dashboard</h1>
+        </div>
+        <nav className="mt-4">
+          {menuItems.map((item) => {
+            const Icon = item.icon;
+            return (
+              <button
+                key={item.id}
+                onClick={() => setActiveSection(item.id)}
+                className={`w-full flex items-center px-4 py-3 text-left transition-colors ${
+                  activeSection === item.id
+                    ? 'bg-blue-50 text-blue-600 border-r-2 border-blue-600'
+                    : 'text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                <Icon className="w-5 h-5 mr-3" />
+                {item.label}
+              </button>
+            );
+          })}
+        </nav>
+        <div className="absolute bottom-0 w-64 p-4 border-t">
+          <Button 
+            onClick={handleLogout}
+            variant="outline" 
+            className="w-full flex items-center justify-center"
+          >
+            <LogOut className="w-4 h-4 mr-2" />
+            Logout
+          </Button>
         </div>
       </div>
-    </SidebarProvider>
+
+      {/* Main Content */}
+      <div className="flex-1 overflow-auto">
+        <div className="p-6">
+          {renderActiveSection()}
+        </div>
+      </div>
+    </div>
   );
 };
 

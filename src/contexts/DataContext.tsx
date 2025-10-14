@@ -13,7 +13,9 @@ import {
   getServiceCharges,
   createServiceCharge as createServiceChargeService,
   updateServiceCharge as updateServiceChargeService,
-  deleteServiceCharge as deleteServiceChargeService
+  deleteServiceCharge as deleteServiceChargeService,
+  getInvoiceHistory,
+  createInvoiceHistory as createInvoiceHistoryService
 } from '@/services/firebaseService';
 
 export interface Employee {
@@ -71,12 +73,7 @@ export interface Invoice {
   total: number;
   description?: string;
   createdAt: string;
-}
-
-export interface ServiceCharge {
-  id: string;
-  name: string;
-  amount: number;
+  candidateName?: string;
 }
 
 interface DataContextType {
@@ -84,6 +81,7 @@ interface DataContextType {
   expenses: Expense[];
   invoices: Invoice[];
   serviceCharges: ServiceCharge[];
+  invoiceHistory: Invoice[];
   loading: boolean;
   error: string | null;
   addEmployee: (email: string, password: string, username?: string, mobile?: string) => Promise<void>;
@@ -98,6 +96,14 @@ interface DataContextType {
   addServiceCharge: (serviceCharge: Omit<ServiceCharge, 'id'>) => Promise<void>;
   updateServiceCharge: (id: string, serviceCharge: Partial<ServiceCharge>) => Promise<void>;
   deleteServiceCharge: (id: string) => Promise<void>;
+  addInvoiceHistory: (invoice: Omit<Invoice, 'id' | 'createdAt'>) => Promise<void>;
+}
+
+export interface ServiceCharge {
+  id: string;
+  name: string;
+  amount: number;
+  sector?: string; // Add optional sector field
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -107,6 +113,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [serviceCharges, setServiceCharges] = useState<ServiceCharge[]>([]);
+  const [invoiceHistory, setInvoiceHistory] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -118,16 +125,18 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const refreshData = async () => {
     try {
       setLoading(true);
-      const [employeesData, expensesData, invoicesData, serviceChargesData] = await Promise.all([
+      const [employeesData, expensesData, invoicesData, serviceChargesData, invoiceHistoryData] = await Promise.all([
         getEmployees(),
         getExpenses(),
         getInvoices(),
-        getServiceCharges()
+        getServiceCharges(),
+        getInvoiceHistory()
       ]);
       setEmployees(employeesData);
       setExpenses(expensesData);
       setInvoices(invoicesData);
       setServiceCharges(serviceChargesData);
+      setInvoiceHistory(invoiceHistoryData);
       setError(null);
     } catch (err) {
       console.error('Error fetching data:', err);
@@ -248,6 +257,21 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const addInvoiceHistory = async (invoice: Omit<Invoice, 'id' | 'createdAt'>) => {
+    try {
+      const newInvoice = {
+        ...invoice,
+        createdAt: new Date().toISOString(),
+      };
+      const createdInvoice = await createInvoiceHistoryService(newInvoice);
+      setInvoiceHistory(prev => [...prev, createdInvoice as Invoice]);
+    } catch (err) {
+      console.error('Error adding invoice history:', err);
+      setError('Failed to add invoice history');
+      throw err;
+    }
+  };
+
   const addServiceCharge = async (serviceCharge: Omit<ServiceCharge, 'id'>) => {
     try {
       const newServiceCharge = {
@@ -293,6 +317,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         expenses,
         invoices,
         serviceCharges,
+        invoiceHistory,
         loading,
         error,
         addEmployee,
@@ -304,6 +329,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         refreshData,
         deleteExpense,
         addInvoice,
+        addInvoiceHistory,
         addServiceCharge,
         updateServiceCharge,
         deleteServiceCharge

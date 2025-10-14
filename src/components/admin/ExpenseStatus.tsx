@@ -1,22 +1,17 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useData } from '@/contexts/DataContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from '@/components/ui/select';
+import { CheckCircle, Clock, FileText, Image as ImageIcon, ChevronDown, ChevronRight } from 'lucide-react';
 import { toast } from 'react-toastify';
-import { FileText, Image as ImageIcon, CheckCircle, Clock } from 'lucide-react';
 
 const ExpenseStatus = () => {
   const { expenses, employees, updateExpense } = useData();
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [expandedClients, setExpandedClients] = useState<Record<string, boolean>>({});
 
   const getFileIcon = (fileName: string | null) => {
     if (!fileName) return <FileText className="w-4 h-4" />;
@@ -56,9 +51,33 @@ const ExpenseStatus = () => {
     }
   };
 
-  const filteredExpenses = statusFilter === 'all' 
-    ? expenses 
-    : expenses.filter(expense => (expense.status || 'pending') === statusFilter);
+  const filteredExpenses = useMemo(() => {
+    return statusFilter === 'all' 
+      ? expenses 
+      : expenses.filter(expense => (expense.status || 'pending') === statusFilter);
+  }, [expenses, statusFilter]);
+
+  // Group expenses by client name
+  const groupedExpenses = useMemo(() => {
+    const groups: Record<string, any[]> = {};
+    
+    filteredExpenses.forEach(expense => {
+      const clientName = expense.clientName || 'Unknown Client';
+      if (!groups[clientName]) {
+        groups[clientName] = [];
+      }
+      groups[clientName].push(expense);
+    });
+    
+    return groups;
+  }, [filteredExpenses]);
+
+  const toggleClientExpansion = (clientName: string) => {
+    setExpandedClients(prev => ({
+      ...prev,
+      [clientName]: !prev[clientName]
+    }));
+  };
 
   const pendingCount = expenses.filter(expense => (expense.status || 'pending') === 'pending').length;
   const receivedCount = expenses.filter(expense => expense.status === 'received').length;
@@ -125,59 +144,95 @@ const ExpenseStatus = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredExpenses.length === 0 ? (
+              {Object.keys(groupedExpenses).length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
                     No expenses found
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredExpenses.map((expense) => {
-                  const employee = employees.find(emp => emp.email === expense.userId);
-                  return (
-                    <TableRow key={expense.id}>
-                      <TableCell className="font-medium">
-                        {employee?.name || expense.userId.split('@')[0]}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary" className="font-semibold">
-                          {formatAmount(expense.amount)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{expense.description}</TableCell>
-                      <TableCell>{expense.company || 'N/A'}</TableCell>
-                      <TableCell>{expense.sector || 'N/A'}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          {getFileIcon(expense.fileName)}
-                          <span className="text-sm text-muted-foreground">
-                            {expense.fileName || 'No file'}
-                          </span>
+                Object.entries(groupedExpenses).map(([clientName, clientExpenses]) => (
+                  <>
+                    {/* Client Group Header */}
+                    <TableRow key={clientName} className="bg-muted/50">
+                      <TableCell colSpan={9} className="font-bold py-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => toggleClientExpansion(clientName)}
+                              className="p-1 h-6 w-6 mr-2"
+                            >
+                              {expandedClients[clientName] ? (
+                                <ChevronDown className="w-4 h-4" />
+                              ) : (
+                                <ChevronRight className="w-4 h-4" />
+                              )}
+                            </Button>
+                            <span>Client: {clientName}</span>
+                            <Badge variant="secondary" className="ml-2">
+                              {clientExpenses.length} expenses
+                            </Badge>
+                          </div>
+                          <div className="text-right">
+                            <Badge variant="outline">
+                              Total: {formatAmount(clientExpenses.reduce((sum, exp) => sum + exp.amount, 0))}
+                            </Badge>
+                          </div>
                         </div>
                       </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {formatDate(expense.date)}
-                      </TableCell>
-                      <TableCell>
-                        {getStatusBadge(expense.status || 'pending')}
-                      </TableCell>
-                      <TableCell>
-                        <Select 
-                          value={expense.status || 'pending'} 
-                          onValueChange={(value) => handleStatusChange(expense.id, value)}
-                        >
-                          <SelectTrigger className="w-32">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="pending">Pending</SelectItem>
-                            <SelectItem value="received">Received</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </TableCell>
                     </TableRow>
-                  );
-                })
+                    
+                    {/* Client Expenses */}
+                    {expandedClients[clientName] && clientExpenses.map((expense) => {
+                      const employee = employees.find(emp => emp.email === expense.userId);
+                      return (
+                        <TableRow key={expense.id}>
+                          <TableCell className="pl-8 font-medium">
+                            {employee?.name || expense.userId.split('@')[0]}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="secondary" className="font-semibold">
+                              {formatAmount(expense.amount)}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{expense.description}</TableCell>
+                          <TableCell>{expense.company || 'N/A'}</TableCell>
+                          <TableCell>{expense.sector || 'N/A'}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              {getFileIcon(expense.fileName)}
+                              <span className="text-sm text-muted-foreground">
+                                {expense.fileName || 'No file'}
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {formatDate(expense.date)}
+                          </TableCell>
+                          <TableCell>
+                            {getStatusBadge(expense.status || 'pending')}
+                          </TableCell>
+                          <TableCell>
+                            <Select 
+                              value={expense.status || 'pending'} 
+                              onValueChange={(value) => handleStatusChange(expense.id, value)}
+                            >
+                              <SelectTrigger className="w-32">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="pending">Pending</SelectItem>
+                                <SelectItem value="received">Received</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </>
+                ))
               )}
             </TableBody>
           </Table>
