@@ -4,13 +4,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Search, ArrowUpDown, Filter, RefreshCw, CheckCircle, XCircle, Save, Calendar } from 'lucide-react';
+import { Search, ArrowUpDown, Filter, RefreshCw, CheckCircle, XCircle, Save, Calendar, Trash2 } from 'lucide-react';
 import { useData } from '@/contexts/DataContext';
 import { toast } from 'react-toastify';
 import { ProfitLossReport } from '@/contexts/DataContext';
+import AlertDialog from './AlertDialog';
 
 const ProfitLoss = () => {
-  const { expenses, invoiceHistory, refreshData, profitLossReports, addProfitLossReport } = useData();
+  const { expenses, invoiceHistory, refreshData, profitLossReports, addProfitLossReport, deleteProfitLossReport } = useData();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterMonth, setFilterMonth] = useState<string>('all');
   const [filterYear, setFilterYear] = useState<string>('all');
@@ -19,6 +20,11 @@ const ProfitLoss = () => {
   const [expenseInvoiceMap, setExpenseInvoiceMap] = useState<Record<string, string>>({});
   const [savedInvoices, setSavedInvoices] = useState<Record<string, { invoiceNumber: string, amount: number }>>({});
   const [activeTab, setActiveTab] = useState<'current' | 'saved'>('current');
+
+  // State for delete confirmation dialog
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [reportToDelete, setReportToDelete] = useState<{id: string, period: string, month?: string, year: string} | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Get unique months and years from expenses
   const uniqueMonths = useMemo(() => {
@@ -49,9 +55,25 @@ const ProfitLoss = () => {
     return Array.from(years).sort((a, b) => parseInt(b) - parseInt(a));
   }, [expenses]);
 
-  // Filter expenses by month and year
+  // Get all expense IDs that have been saved in reports
+  const reportedExpenseIds = useMemo(() => {
+    const ids = new Set<string>();
+    profitLossReports.forEach(report => {
+      report.reportData.forEach(data => {
+        if (data.expenseId) {
+          ids.add(data.expenseId);
+        }
+      });
+    });
+    return ids;
+  }, [profitLossReports]);
+
+  // Filter expenses by month and year, and exclude those already in reports
   const filteredExpenses = useMemo(() => {
     let filtered = [...expenses];
+    
+    // Exclude expenses that are already in reports
+    filtered = filtered.filter(expense => !reportedExpenseIds.has(expense.id));
     
     if (filterMonth !== 'all') {
       filtered = filtered.filter(expense => {
@@ -79,7 +101,7 @@ const ProfitLoss = () => {
     }
     
     return filtered;
-  }, [expenses, filterMonth, filterYear, searchTerm]);
+  }, [expenses, filterMonth, filterYear, searchTerm, reportedExpenseIds]);
 
   // Handle invoice number change for an expense
   const handleInvoiceNumberChange = (expenseId: string, invoiceNumber: string) => {
@@ -217,6 +239,15 @@ const ProfitLoss = () => {
   // Save current profit/loss data as a report
   const handleSaveReport = async () => {
     try {
+      // Check if there are any expenses with invoice numbers
+      const expensesWithInvoices = sortedData.filter(item => item.invoiceNumber && item.invoiceNumber.trim() !== '');
+      
+      // If no expenses have invoice numbers, don't save the report
+      if (expensesWithInvoices.length === 0) {
+        toast.error('Cannot save report: No expenses have invoice numbers. Please enter invoice numbers for at least one expense.');
+        return;
+      }
+      
       // Prepare report data
       const reportData = sortedData.map(item => ({
         expenseId: item.id,
@@ -290,6 +321,41 @@ const ProfitLoss = () => {
       return true;
     });
   }, [profitLossReports, filterMonth, filterYear]);
+
+  // Handle delete report
+  const handleDeleteReport = async () => {
+    if (!reportToDelete) return;
+    
+    setIsDeleting(true);
+    try {
+      await deleteProfitLossReport(reportToDelete.id);
+      toast.success('Report deleted successfully!');
+      setIsDeleteDialogOpen(false);
+      setReportToDelete(null);
+    } catch (error: any) {
+      console.error('Error deleting report:', error);
+      toast.error(`Failed to delete report: ${error.message || 'Unknown error'}`);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  // Open delete confirmation dialog
+  const openDeleteDialog = (report: ProfitLossReport) => {
+    setReportToDelete({
+      id: report.id,
+      period: report.period,
+      month: report.month,
+      year: report.year
+    });
+    setIsDeleteDialogOpen(true);
+  };
+
+  // Close delete confirmation dialog
+  const closeDeleteDialog = () => {
+    setIsDeleteDialogOpen(false);
+    setReportToDelete(null);
+  };
 
   return (
     <Card>
@@ -384,7 +450,12 @@ const ProfitLoss = () => {
               </Button>
               
               {activeTab === 'current' && (
-                <Button onClick={handleSaveReport} className="gap-2">
+                <Button 
+                  onClick={handleSaveReport} 
+                  className="gap-2"
+                  disabled={sortedData.filter(item => item.invoiceNumber && item.invoiceNumber.trim() !== '').length === 0}
+                  title={sortedData.filter(item => item.invoiceNumber && item.invoiceNumber.trim() !== '').length === 0 ? "Enter invoice numbers for at least one expense to save report" : "Save current report"}
+                >
                   <Save className="w-4 h-4" />
                   Save Report
                 </Button>
@@ -571,6 +642,7 @@ const ProfitLoss = () => {
               </div>
               <div className="mt-4 text-sm text-muted-foreground">
                 <p><strong>How it works:</strong> Enter invoice numbers for each expense to link them to revenue. Profit/Loss = Revenue - Expense.</p>
+                <p className="mt-2 text-blue-600"><strong>Note:</strong> Reports can only be saved when at least one expense has an invoice number.</p>
               </div>
             </div>
           </>
@@ -588,6 +660,7 @@ const ProfitLoss = () => {
                   <TableHead className="text-right">Profit/Loss</TableHead>
                   <TableHead className="text-center">Status</TableHead>
                   <TableHead>Date Saved</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -610,11 +683,20 @@ const ProfitLoss = () => {
                       <TableCell>
                         {new Date(report.createdAt).toLocaleDateString()}
                       </TableCell>
+                      <TableCell className="text-right">
+                        <Button 
+                          variant="destructive" 
+                          size="sm"
+                          onClick={() => openDeleteDialog(report)}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                       No saved reports found
                     </TableCell>
                   </TableRow>
@@ -648,6 +730,17 @@ const ProfitLoss = () => {
           </div>
         )}
       </CardContent>
+      
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog
+        isOpen={isDeleteDialogOpen}
+        onClose={closeDeleteDialog}
+        onConfirm={handleDeleteReport}
+        title="Delete Report"
+        description={`Are you sure you want to delete the ${reportToDelete?.period} report for ${reportToDelete?.month ? reportToDelete.month + ' ' : ''}${reportToDelete?.year}? This action cannot be undone.`}
+        confirmText="Delete Report"
+        isDeleting={isDeleting}
+      />
     </Card>
   );
 };

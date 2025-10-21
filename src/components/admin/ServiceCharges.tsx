@@ -461,408 +461,408 @@ const ServiceCharges = () => {
               <X className="w-4 h-4 mr-2" />
               Delete Selected
             </Button>
-            
-            {/* Excel Import Dialog */}
-            <Dialog open={isExcelImportDialogOpen} onOpenChange={setIsExcelImportDialogOpen}>
-              <DialogTrigger asChild>
-                <Button variant="outline">
-                  <FileSpreadsheet className="w-4 h-4 mr-2" />
-                  Import Excel
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-md">
-                <DialogHeader>
-                  <DialogTitle>Import Service Charges from Excel</DialogTitle>
-                  <DialogDescription>
-                    Upload an Excel file containing service charges data
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                    <FileSpreadsheet className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                    <p className="text-sm text-gray-600 mb-2">
-                      Excel file can have:
-                      <br />
-                      • Three columns: Sector Name, Service Name, Amount
-                      <br />
-                      • Multiple columns: Headers as service names
-                    </p>
-                    <Button onClick={triggerFileInput} variant="outline">
-                      Select Excel File
+              
+              {/* Excel Import Dialog */}
+              <Dialog open={isExcelImportDialogOpen} onOpenChange={setIsExcelImportDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline">
+                    <FileSpreadsheet className="w-4 h-4 mr-2" />
+                    Import Excel
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Import Service Charges from Excel</DialogTitle>
+                    <DialogDescription>
+                      Upload an Excel file containing service charges data
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                      <FileSpreadsheet className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                      <p className="text-sm text-gray-600 mb-2">
+                        Excel file can have:
+                        <br />
+                        • Three columns: Sector Name, Service Name, Amount
+                        <br />
+                        • Multiple columns: Headers as service names
+                      </p>
+                      <Button onClick={triggerFileInput} variant="outline">
+                        Select Excel File
+                      </Button>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept=".xlsx,.xls"
+                        onChange={handleExcelImport}
+                        className="hidden"
+                      />
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      <p className="font-medium">Format Requirements:</p>
+                      <ul className="list-disc pl-5 space-y-1 mt-1">
+                        <li>First row: Headers (Sector Name, Service Name, Amount)</li>
+                        <li>Subsequent rows: Sector, Service, and Amount data</li>
+                        <li>For 3-column format: Column 1 = Sector Name, Column 2 = Service Name, Column 3 = Amount</li>
+                        <li>Example: Tourism, Camping, 8000</li>
+                        <li>For multiple columns: Headers as service names, rows with service,amount pairs</li>
+                      </ul>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setIsExcelImportDialogOpen(false)}>
+                      Cancel
                     </Button>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept=".xlsx,.xls"
-                      onChange={handleExcelImport}
-                      className="hidden"
-                    />
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    <p className="font-medium">Format Requirements:</p>
-                    <ul className="list-disc pl-5 space-y-1 mt-1">
-                      <li>First row: Headers (Sector Name, Service Name, Amount)</li>
-                      <li>Subsequent rows: Sector, Service, and Amount data</li>
-                      <li>For 3-column format: Column 1 = Sector Name, Column 2 = Service Name, Column 3 = Amount</li>
-                      <li>Example: Tourism, Camping, 8000</li>
-                      <li>For multiple columns: Headers as service names, rows with service,amount pairs</li>
-                    </ul>
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setIsExcelImportDialogOpen(false)}>
-                    Cancel
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+              
+              <Dialog open={isBulkImportDialogOpen} onOpenChange={setIsBulkImportDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline">
+                    <Upload className="w-4 h-4 mr-2" />
+                    Bulk Import
                   </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-            
-            <Dialog open={isBulkImportDialogOpen} onOpenChange={setIsBulkImportDialogOpen}>
-              <DialogTrigger asChild>
-                <Button variant="outline">
-                  <Upload className="w-4 h-4 mr-2" />
-                  Bulk Import
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl">
-                <DialogHeader>
-                  <DialogTitle>Bulk Import Service Charges</DialogTitle>
-                  <DialogDescription>
-                    Paste your service charge data in the format: "Sector, Service Name, Amount" (one per line)
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="bulkData">Service Charge Data</Label>
-                    <Textarea
-                      id="bulkData"
-                      placeholder="Enter service charges in the format: Sector, Service Name, Amount&#10;Example:&#10;Immigration, Visa Processing, 1500&#10;Immigration, Passport, 800&#10;Travel, Air Ticket, 1300&#10;Accommodation, Hotel Booking, 500&#10;Transportation, Airport Transfer, 250"
-                      value={bulkImportData}
-                      onChange={(e) => setBulkImportData(e.target.value)}
-                      rows={10}
-                      className="font-mono text-sm"
-                    />
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl">
+                  <DialogHeader>
+                    <DialogTitle>Bulk Import Service Charges</DialogTitle>
+                    <DialogDescription>
+                      Paste your service charge data in the format: "Sector, Service Name, Amount" (one per line)
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="bulkData">Service Charge Data</Label>
+                      <Textarea
+                        id="bulkData"
+                        placeholder="Enter service charges in the format: Sector, Service Name, Amount&#10;Example:&#10;Immigration, Visa Processing, 1500&#10;Immigration, Passport, 800&#10;Travel, Air Ticket, 1300&#10;Accommodation, Hotel Booking, 500&#10;Transportation, Airport Transfer, 250"
+                        value={bulkImportData}
+                        onChange={(e) => setBulkImportData(e.target.value)}
+                        rows={10}
+                        className="font-mono text-sm"
+                      />
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      <p className="font-medium">Format Instructions:</p>
+                      <ul className="list-disc pl-5 space-y-1 mt-1">
+                        <li>Enter one service charge per line</li>
+                        <li>Format: "Sector, Service Name, Amount" (three values) - Recommended</li>
+                        <li>Separate values with commas</li>
+                        <li>Amount should be a number (no currency symbols)</li>
+                        <li>Example: "Immigration, Visa Processing, 1500"</li>
+                      </ul>
+                    </div>
                   </div>
-                  <div className="text-sm text-muted-foreground">
-                    <p className="font-medium">Format Instructions:</p>
-                    <ul className="list-disc pl-5 space-y-1 mt-1">
-                      <li>Enter one service charge per line</li>
-                      <li>Format: "Sector, Service Name, Amount" (three values) - Recommended</li>
-                      <li>Separate values with commas</li>
-                      <li>Amount should be a number (no currency symbols)</li>
-                      <li>Example: "Immigration, Visa Processing, 1500"</li>
-                    </ul>
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setIsBulkImportDialogOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button onClick={handleBulkImport}>
-                    Import Service Charges
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-              <DialogTrigger asChild>
-                <Button>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Service Charge
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Add New Service Charge</DialogTitle>
-                  <DialogDescription>
-                    Add a new service with its predefined charge amount
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="sectorName">Sector (Optional)</Label>
-                    <Input
-                      id="sectorName"
-                      placeholder="Enter sector name"
-                      value={newCharge.sector}
-                      onChange={(e) => setNewCharge({...newCharge, sector: e.target.value})}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="serviceName">Service Name</Label>
-                    <Input
-                      id="serviceName"
-                      placeholder="Enter service name"
-                      value={newCharge.name}
-                      onChange={(e) => setNewCharge({...newCharge, name: e.target.value})}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="serviceAmount">Amount (S$)</Label>
-                    <Input
-                      id="serviceAmount"
-                      type="number"
-                      placeholder="Enter amount"
-                      value={newCharge.amount}
-                      onChange={(e) => setNewCharge({...newCharge, amount: e.target.value})}
-                    />
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button onClick={handleAddCharge}>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setIsBulkImportDialogOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button onClick={handleBulkImport}>
+                      Import Service Charges
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button>
+                    <Plus className="w-4 h-4 mr-2" />
                     Add Service Charge
                   </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent>
-        {/* Search Bar */}
-        <div className="mb-4 flex items-center">
-          <div className="relative w-full max-w-md">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Search service charges..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-        </div>
-        
-        {/* Excel Sector Data Section */}
-        {excelSectorData.length > 0 && (
-          <div className="mb-6 border rounded-lg overflow-hidden">
-            <div className="bg-muted p-3 font-medium flex items-center justify-between">
-              <div className="flex items-center">
-                <FileSpreadsheet className="w-5 h-5 mr-2" />
-                Excel Sector Data
-              </div>
-              <Button variant="outline" size="sm" onClick={handleClearExcelData}>
-                <Trash2 className="w-4 h-4 mr-1" />
-                Clear Data
-              </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Add New Service Charge</DialogTitle>
+                    <DialogDescription>
+                      Add a new service with its predefined charge amount
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="sectorName">Sector (Optional)</Label>
+                      <Input
+                        id="sectorName"
+                        placeholder="Enter sector name"
+                        value={newCharge.sector}
+                        onChange={(e) => setNewCharge({...newCharge, sector: e.target.value})}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="serviceName">Service Name</Label>
+                      <Input
+                        id="serviceName"
+                        placeholder="Enter service name"
+                        value={newCharge.name}
+                        onChange={(e) => setNewCharge({...newCharge, name: e.target.value})}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="serviceAmount">Amount (S$)</Label>
+                      <Input
+                        id="serviceAmount"
+                        type="number"
+                        placeholder="Enter amount"
+                        value={newCharge.amount}
+                        onChange={(e) => setNewCharge({...newCharge, amount: e.target.value})}
+                      />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button onClick={handleAddCharge}>
+                      Add Service Charge
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </div>
-            <div className="max-h-96 overflow-auto">
-              {excelSectorData.map((sector, sectorIndex) => (
-                <div key={sectorIndex} className="border-b last:border-b-0">
+          </div>
+        </CardHeader>
+        <CardContent>
+          {/* Search Bar */}
+          <div className="mb-4 flex items-center">
+            <div className="relative w-full max-w-md">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search service charges..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+          </div>
+          
+          {/* Excel Sector Data Section */}
+          {excelSectorData.length > 0 && (
+            <div className="mb-6 border rounded-lg overflow-hidden">
+              <div className="bg-muted p-3 font-medium flex items-center justify-between">
+                <div className="flex items-center">
+                  <FileSpreadsheet className="w-5 h-5 mr-2" />
+                  Excel Sector Data
+                </div>
+                <Button variant="outline" size="sm" onClick={handleClearExcelData}>
+                  <Trash2 className="w-4 h-4 mr-1" />
+                  Clear Data
+                </Button>
+              </div>
+              <div className="max-h-96 overflow-auto">
+                {excelSectorData.map((sector, sectorIndex) => (
+                  <div key={sectorIndex} className="border-b last:border-b-0">
+                    <div 
+                      className="flex items-center justify-between p-3 bg-gray-50 cursor-pointer hover:bg-gray-100"
+                      onClick={() => toggleSector(sector.sectorName)}
+                    >
+                      <div className="font-medium">
+                        {sector.sectorName} ({sector.services.length} services)
+                      </div>
+                      <Button variant="ghost" size="sm">
+                        {expandedSectors[sector.sectorName] ? 
+                          <ChevronDown className="w-4 h-4" /> : 
+                          <ChevronRight className="w-4 h-4" />
+                        }
+                      </Button>
+                    </div>
+                    {expandedSectors[sector.sectorName] && (
+                      <div className="p-3">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Service Name</TableHead>
+                              <TableHead>Amount</TableHead>
+                              <TableHead className="text-right">Actions</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {sector.services.map((service, serviceIndex) => (
+                              <TableRow key={serviceIndex}>
+                                <TableCell>
+                                  {editingExcelData?.sectorIndex === sectorIndex && 
+                                   editingExcelData.serviceIndex === serviceIndex && 
+                                   editingExcelData.field === 'name' ? (
+                                    <Input
+                                      value={editingExcelData.value}
+                                      onChange={(e) => handleEditExcelData(sectorIndex, serviceIndex, 'name', e.target.value)}
+                                      onBlur={saveEditedExcelData}
+                                      onKeyDown={(e) => e.key === 'Enter' && saveEditedExcelData()}
+                                      autoFocus
+                                    />
+                                  ) : (
+                                    <div 
+                                      onClick={() => handleEditExcelData(sectorIndex, serviceIndex, 'name', service.name)}
+                                      className="cursor-pointer hover:underline"
+                                    >
+                                      {service.name}
+                                    </div>
+                                  )}
+                                </TableCell>
+                                <TableCell>
+                                  {editingExcelData?.sectorIndex === sectorIndex && 
+                                   editingExcelData.serviceIndex === serviceIndex && 
+                                   editingExcelData.field === 'amount' ? (
+                                    <Input
+                                      type="number"
+                                      value={editingExcelData.value}
+                                      onChange={(e) => handleEditExcelData(sectorIndex, serviceIndex, 'amount', e.target.value)}
+                                      onBlur={saveEditedExcelData}
+                                      onKeyDown={(e) => e.key === 'Enter' && saveEditedExcelData()}
+                                      autoFocus
+                                    />
+                                  ) : (
+                                    <div 
+                                      onClick={() => handleEditExcelData(sectorIndex, serviceIndex, 'amount', service.amount.toString())}
+                                      className="cursor-pointer hover:underline"
+                                    >
+                                      {formatAmount(service.amount)}
+                                    </div>
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleDeleteExcelService(sectorIndex, serviceIndex)}
+                                    className="text-red-500 hover:text-red-700"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {/* Grouped Service Charges by Sector */}
+          <div className="border rounded-lg overflow-hidden">
+            {Object.keys(groupedServiceCharges).length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No service charges found. Add some service charges to get started.
+              </div>
+            ) : (
+              Object.entries(groupedServiceCharges).map(([sector, charges]) => (
+                <div key={sector} className="border-b last:border-b-0">
+                  {/* Sector Header */}
                   <div 
                     className="flex items-center justify-between p-3 bg-gray-50 cursor-pointer hover:bg-gray-100"
-                    onClick={() => toggleSector(sector.sectorName)}
+                    onClick={() => toggleSector(sector)}
                   >
                     <div className="font-medium">
-                      {sector.sectorName} ({sector.services.length} services)
+                      {sector} ({charges.length} services)
                     </div>
                     <Button variant="ghost" size="sm">
-                      {expandedSectors[sector.sectorName] ? 
+                      {expandedSectors[sector] ? 
                         <ChevronDown className="w-4 h-4" /> : 
                         <ChevronRight className="w-4 h-4" />
                       }
                     </Button>
                   </div>
-                  {expandedSectors[sector.sectorName] && (
-                    <div className="p-3">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Service Name</TableHead>
-                            <TableHead>Amount</TableHead>
-                            <TableHead className="text-right">Actions</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {sector.services.map((service, serviceIndex) => (
-                            <TableRow key={serviceIndex}>
-                              <TableCell>
-                                {editingExcelData?.sectorIndex === sectorIndex && 
-                                 editingExcelData.serviceIndex === serviceIndex && 
-                                 editingExcelData.field === 'name' ? (
-                                  <Input
-                                    value={editingExcelData.value}
-                                    onChange={(e) => handleEditExcelData(sectorIndex, serviceIndex, 'name', e.target.value)}
-                                    onBlur={saveEditedExcelData}
-                                    onKeyDown={(e) => e.key === 'Enter' && saveEditedExcelData()}
-                                    autoFocus
-                                  />
-                                ) : (
-                                  <div 
-                                    onClick={() => handleEditExcelData(sectorIndex, serviceIndex, 'name', service.name)}
-                                    className="cursor-pointer hover:underline"
-                                  >
-                                    {service.name}
-                                  </div>
-                                )}
-                              </TableCell>
-                              <TableCell>
-                                {editingExcelData?.sectorIndex === sectorIndex && 
-                                 editingExcelData.serviceIndex === serviceIndex && 
-                                 editingExcelData.field === 'amount' ? (
-                                  <Input
-                                    type="number"
-                                    value={editingExcelData.value}
-                                    onChange={(e) => handleEditExcelData(sectorIndex, serviceIndex, 'amount', e.target.value)}
-                                    onBlur={saveEditedExcelData}
-                                    onKeyDown={(e) => e.key === 'Enter' && saveEditedExcelData()}
-                                    autoFocus
-                                  />
-                                ) : (
-                                  <div 
-                                    onClick={() => handleEditExcelData(sectorIndex, serviceIndex, 'amount', service.amount.toString())}
-                                    className="cursor-pointer hover:underline"
-                                  >
-                                    {formatAmount(service.amount)}
-                                  </div>
-                                )}
-                              </TableCell>
-                              <TableCell className="text-right">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleDeleteExcelService(sectorIndex, serviceIndex)}
-                                  className="text-red-500 hover:text-red-700"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </Button>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-        
-        {/* Grouped Service Charges by Sector */}
-        <div className="border rounded-lg overflow-hidden">
-          {Object.keys(groupedServiceCharges).length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              No service charges found. Add some service charges to get started.
-            </div>
-          ) : (
-            Object.entries(groupedServiceCharges).map(([sector, charges]) => (
-              <div key={sector} className="border-b last:border-b-0">
-                {/* Sector Header */}
-                <div 
-                  className="flex items-center justify-between p-3 bg-gray-50 cursor-pointer hover:bg-gray-100"
-                  onClick={() => toggleSector(sector)}
-                >
-                  <div className="font-medium">
-                    {sector} ({charges.length} services)
-                  </div>
-                  <Button variant="ghost" size="sm">
-                    {expandedSectors[sector] ? 
-                      <ChevronDown className="w-4 h-4" /> : 
-                      <ChevronRight className="w-4 h-4" />
-                    }
-                  </Button>
-                </div>
-                
-                {/* Sector Services */}
-                {expandedSectors[sector] && (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-12">
-                          <Button variant="ghost" size="sm" onClick={handleSelectAll} className="p-0 h-8 w-8">
-                            {selectAll ? (
-                              <Check className="w-4 h-4 text-blue-500" />
-                            ) : (
-                              <div className="w-4 h-4 border rounded"></div>
-                            )}
-                          </Button>
-                        </TableHead>
-                        <TableHead>Service Name</TableHead>
-                        <TableHead>Amount</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {charges.map((charge) => (
-                        <TableRow key={charge.id}>
-                          <TableCell>
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
-                              onClick={() => handleSelectCharge(charge.id)}
-                              className="p-0 h-8 w-8"
-                            >
-                              {isChargeSelected(charge.id) ? (
+                  
+                  {/* Sector Services */}
+                  {expandedSectors[sector] && (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-12">
+                            <Button variant="ghost" size="sm" onClick={handleSelectAll} className="p-0 h-8 w-8">
+                              {selectAll ? (
                                 <Check className="w-4 h-4 text-blue-500" />
                               ) : (
                                 <div className="w-4 h-4 border rounded"></div>
                               )}
                             </Button>
-                          </TableCell>
-                          <TableCell>
-                            {editingCharge?.id === charge.id ? (
-                              <Input
-                                value={editingCharge.name}
-                                onChange={(e) => setEditingCharge({...editingCharge, name: e.target.value})}
-                              />
-                            ) : (
-                              charge.name
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {editingCharge?.id === charge.id ? (
-                              <Input
-                                type="number"
-                                value={editingCharge.amount}
-                                onChange={(e) => setEditingCharge({...editingCharge, amount: parseFloat(e.target.value) || 0})}
-                              />
-                            ) : (
-                              formatAmount(charge.amount)
-                            )}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {editingCharge?.id === charge.id ? (
-                              <div className="flex justify-end gap-2">
-                                <Button size="sm" onClick={handleSaveEdit}>
-                                  <Save className="w-4 h-4 mr-1" />
-                                  Save
-                                </Button>
-                                <Button size="sm" variant="outline" onClick={() => setEditingCharge(null)}>
-                                  <X className="w-4 h-4 mr-1" />
-                                  Cancel
-                                </Button>
-                              </div>
-                            ) : (
-                              <div className="flex justify-end gap-2">
-                                <Button size="sm" onClick={() => handleEditCharge(charge)}>
-                                  <Edit className="w-4 h-4 mr-1" />
-                                  Edit
-                                </Button>
-                                <Button 
-                                  size="sm" 
-                                  variant="destructive" 
-                                  onClick={() => handleDeleteCharge(charge.id)}
-                                >
-                                  <X className="w-4 h-4 mr-1" />
-                                  Delete
-                                </Button>
-                              </div>
-                            )}
-                          </TableCell>
+                          </TableHead>
+                          <TableHead>Service Name</TableHead>
+                          <TableHead>Amount</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                )}
-              </div>
-            ))
-          )}
-        </div>
-      </CardContent>
-    </Card>
+                      </TableHeader>
+                      <TableBody>
+                        {charges.map((charge) => (
+                          <TableRow key={charge.id}>
+                            <TableCell>
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                onClick={() => handleSelectCharge(charge.id)}
+                                className="p-0 h-8 w-8"
+                              >
+                                {isChargeSelected(charge.id) ? (
+                                  <Check className="w-4 h-4 text-blue-500" />
+                                ) : (
+                                  <div className="w-4 h-4 border rounded"></div>
+                                )}
+                              </Button>
+                            </TableCell>
+                            <TableCell>
+                              {editingCharge?.id === charge.id ? (
+                                <Input
+                                  value={editingCharge.name}
+                                  onChange={(e) => setEditingCharge({...editingCharge, name: e.target.value})}
+                                />
+                              ) : (
+                                charge.name
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {editingCharge?.id === charge.id ? (
+                                <Input
+                                  type="number"
+                                  value={editingCharge.amount}
+                                  onChange={(e) => setEditingCharge({...editingCharge, amount: parseFloat(e.target.value) || 0})}
+                                />
+                              ) : (
+                                formatAmount(charge.amount)
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {editingCharge?.id === charge.id ? (
+                                <div className="flex justify-end gap-2">
+                                  <Button size="sm" onClick={handleSaveEdit}>
+                                    <Save className="w-4 h-4 mr-1" />
+                                    Save
+                                  </Button>
+                                  <Button size="sm" variant="outline" onClick={() => setEditingCharge(null)}>
+                                    <X className="w-4 h-4 mr-1" />
+                                    Cancel
+                                  </Button>
+                                </div>
+                              ) : (
+                                <div className="flex justify-end gap-2">
+                                  <Button size="sm" onClick={() => handleEditCharge(charge)}>
+                                    <Edit className="w-4 h-4 mr-1" />
+                                    Edit
+                                  </Button>
+                                  <Button 
+                                    size="sm" 
+                                    variant="destructive" 
+                                    onClick={() => handleDeleteCharge(charge.id)}
+                                  >
+                                    <X className="w-4 h-4 mr-1" />
+                                    Delete
+                                  </Button>
+                                </div>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </CardContent>
+      </Card>
   );
 };
 

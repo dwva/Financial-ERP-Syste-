@@ -21,14 +21,17 @@ import {
   createProfitLossReport as createProfitLossReportService,
   updateProfitLossReport as updateProfitLossReportService,
   deleteProfitLossReport as deleteProfitLossReportService,
-  getAllMessages as getAllMessagesService
+  onExpensesChange // Add this import
 } from '@/services/firebaseService';
 import { 
   sendMessage as sendMsg,
   getUserMessages as getUserMsgs,
   getAdminMessages as getAdminMsgs,
   markMessageAsRead as markMsgRead,
-  uploadFile as uploadMsgFile
+  uploadFile as uploadMsgFile,
+  getAllMessages as getAllMessagesService,
+  getMessageById as getMessageByIdService,
+  deleteMessage as deleteMessageService
 } from '@/services/messageService';
 import { Message } from '@/services/messageService';
 
@@ -141,7 +144,9 @@ interface DataContextType {
   sendMessage: (message: Omit<Message, 'id' | 'timestamp'>, file?: File) => Promise<Message>;
   getUserMessages: (userId: string) => Promise<Message[]>;
   getAdminMessages: (adminId: string) => Promise<Message[]>;
+  getMessageById: (messageId: string) => Promise<any>;
   markMessageAsRead: (messageId: string) => Promise<void>;
+  deleteMessage: (messageId: string) => Promise<void>;
   // Profit/Loss functions
   addProfitLossReport: (report: Omit<ProfitLossReport, 'id' | 'createdAt'>) => Promise<void>;
   updateProfitLossReport: (id: string, report: Partial<ProfitLossReport>) => Promise<void>;
@@ -160,10 +165,25 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [profitLossReports, setProfitLossReports] = useState<ProfitLossReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [unsubscribeExpenses, setUnsubscribeExpenses] = useState<(() => void) | null>(null); // Add this state
 
-  // Fetch initial data
+  // Fetch initial data and set up real-time listeners
   useEffect(() => {
     refreshData();
+    
+    // Set up real-time listener for expenses
+    const unsubscribe = onExpensesChange((newExpenses) => {
+      setExpenses(newExpenses);
+    });
+    
+    setUnsubscribeExpenses(() => unsubscribe);
+    
+    // Clean up listener on unmount
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
   }, []);
 
   const refreshData = async () => {
@@ -171,7 +191,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(true);
       const [employeesData, expensesData, invoicesData, serviceChargesData, invoiceHistoryData, profitLossReportsData] = await Promise.all([
         getEmployees(),
-        getExpenses(),
+        getExpenses(), // This will be replaced by real-time listener but keep for initial load
         getInvoices(),
         getServiceCharges(),
         getInvoiceHistory(),
@@ -414,10 +434,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       let fileName = '';
       
       if (file) {
-        console.log('Uploading file:', file.name);
         fileUrl = await uploadMsgFile(file, file.name);
         fileName = file.name;
-        console.log('File uploaded:', { fileUrl, fileName });
       }
       
       const messageToSend: any = {
@@ -433,12 +451,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         messageToSend.fileName = fileName;
       }
       
-      console.log('Sending message to service:', messageToSend);
       const result = await sendMsg(messageToSend);
-      console.log('Message sent result:', result);
       return result;
     } catch (err: any) {
-      console.error('Error sending message:', err);
       setError('Failed to send message');
       throw new Error(err.message || err.toString() || 'Failed to send message. Please try again.');
     }
@@ -446,12 +461,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const getUserMessages = async (userId: string) => {
     try {
-      console.log('Fetching user messages for receiverId:', userId);
       const result = await getUserMsgs(userId);
-      console.log('Fetched user messages:', result);
       return result;
     } catch (err) {
-      console.error('Error fetching user messages:', err);
       setError('Failed to fetch messages');
       throw err;
     }
@@ -459,17 +471,15 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const getAdminMessages = async (adminId: string) => {
     try {
-      console.log('Fetching admin messages for senderId:', adminId);
       const result = await getAdminMsgs(adminId);
-      console.log('Fetched admin messages:', result);
       return result;
     } catch (err: any) {
-      console.error('Error fetching admin messages:', err);
       // Provide more specific error message
       if (err.message && err.message.includes('query requires an index')) {
-        // This is a common Firebase requirement, don't show as an error to user
-        console.log('Firebase index being created. Returning empty message list for now.');
-        return [];
+        // This is a common Firebase requirement, re-throw the error so the UI can handle it properly
+        console.log('Firebase index being created. Throwing error for proper handling.');
+        // Provide a more user-friendly error message
+        throw new Error('Setting up message history for the first time. This may take a moment. Please try again in a few seconds.');
       }
       const errorMessage = err.message || 'Failed to fetch messages';
       setError(errorMessage);
@@ -477,24 +487,39 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const getMessageById = async (messageId: string) => {
+    try {
+      const result = await getMessageByIdService(messageId);
+      return result;
+    } catch (err) {
+      setError('Failed to fetch message');
+      throw err;
+    }
+  };
+
   const markMessageAsRead = async (messageId: string) => {
     try {
       await markMsgRead(messageId);
     } catch (err) {
-      console.error('Error marking message as read:', err);
       setError('Failed to mark message as read');
+      throw err;
+    }
+  };
+
+  const deleteMessage = async (messageId: string) => {
+    try {
+      await deleteMessageService(messageId);
+    } catch (err) {
+      setError('Failed to delete message');
       throw err;
     }
   };
 
   const getAllMessages = async () => {
     try {
-      console.log('Fetching all messages');
       const result = await getAllMessagesService();
-      console.log('Fetched all messages:', result);
       return result;
     } catch (err) {
-      console.error('Error fetching all messages:', err);
       setError('Failed to fetch messages');
       throw err;
     }
@@ -529,7 +554,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         sendMessage,
         getUserMessages,
         getAdminMessages,
+        getMessageById,
         markMessageAsRead,
+        deleteMessage,
         // Profit/Loss functions
         addProfitLossReport,
         updateProfitLossReport,

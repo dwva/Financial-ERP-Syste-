@@ -9,7 +9,9 @@ import {
   orderBy,
   Timestamp,
   updateDoc,
-  doc
+  doc,
+  getDoc,
+  deleteDoc
 } from 'firebase/firestore';
 import { 
   ref, 
@@ -44,13 +46,12 @@ export const sendMessage = async (message: Omit<Message, 'id' | 'timestamp'>) =>
       read: false
     };
     
-    console.log('Sending message data:', messageData);
     const docRef = await addDoc(messagesCollection, messageData);
     const result = { id: docRef.id, ...messageData };
-    console.log('Message sent successfully:', result);
+    
     return result;
   } catch (error) {
-    console.error('Error sending message:', error);
+    console.error('Service: Error sending message:', error);
     throw error;
   }
 };
@@ -90,17 +91,46 @@ export const getUserMessages = async (userId: string) => {
   }
 };
 
+// Get a specific message by ID (for debugging)
+export const getMessageById = async (messageId: string) => {
+  try {
+    console.log('Fetching message by ID:', messageId);
+    const messageDoc = doc(db, 'messages', messageId);
+    const docSnap = await getDoc(messageDoc);
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      console.log('Found message:', { id: docSnap.id, ...data });
+      return { id: docSnap.id, ...data };
+    } else {
+      console.log('No message found with ID:', messageId);
+      return null;
+    }
+  } catch (error) {
+    console.error('Error fetching message by ID:', error);
+    throw error;
+  }
+};
+
 // Get all messages (for debugging purposes)
 export const getAllMessages = async () => {
   try {
+    console.log('Fetching all messages from database');
     const querySnapshot = await getDocs(messagesCollection);
-    const messages = querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...(doc.data() as any)
-    })) as Message[];
+    console.log('Total messages in database:', querySnapshot.docs.length);
+    const messages = querySnapshot.docs.map(doc => {
+      const data = doc.data();
+      console.log('Message data:', { id: doc.id, ...data });
+      return {
+        id: doc.id,
+        ...(data as any)
+      };
+    }) as Message[];
+    console.log('Fetched all messages:', messages);
     return messages;
   } catch (error) {
     console.error('Error fetching all messages:', error);
+    console.error('Error code:', error.code);
+    console.error('Error message:', error.message);
     throw error;
   }
 };
@@ -108,25 +138,20 @@ export const getAllMessages = async () => {
 // Get messages sent by admin
 export const getAdminMessages = async (adminId: string) => {
   try {
-    console.log('Fetching admin messages for senderId:', adminId);
     const q = query(
       messagesCollection, 
       where('senderId', '==', adminId),
       orderBy('timestamp', 'desc')
     );
     const querySnapshot = await getDocs(q);
-    console.log('Query returned', querySnapshot.docs.length, 'documents');
-    
     const messages = querySnapshot.docs.map(doc => {
       const data = doc.data();
-      console.log('Document data:', { id: doc.id, ...data });
       return {
         id: doc.id,
         ...(data as any)
       };
     }) as Message[];
     
-    console.log('Fetched admin messages:', messages);
     return messages;
   } catch (error: any) {
     console.error('Error fetching admin messages:', error);
@@ -137,8 +162,6 @@ export const getAdminMessages = async (adminId: string) => {
       throw new Error('Service unavailable: Please try again later');
     } else if (error.code === 'failed-precondition' && error.message.includes('query requires an index')) {
       // Handle the index requirement error
-      console.log('Firebase index required for query. This is normal on first use.');
-      // Re-throw the error so the calling function can handle it
       throw error;
     } else {
       throw new Error(`Failed to load message history: ${error.message || 'Unknown error'}`);
@@ -157,3 +180,25 @@ export const markMessageAsRead = async (messageId: string) => {
     throw error;
   }
 };
+
+// Delete a message
+export const deleteMessage = async (messageId: string) => {
+  try {
+    const messageDoc = doc(db, 'messages', messageId);
+    // Note: In a production environment, you might want to implement soft delete
+    // or move messages to an archive collection instead of hard deleting
+    await deleteDoc(messageDoc);
+    return messageId;
+  } catch (error) {
+    console.error('Error deleting message:', error);
+    throw error;
+  }
+};
+
+
+
+
+
+
+
+

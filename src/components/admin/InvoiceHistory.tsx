@@ -7,6 +7,7 @@ import { useData } from '@/contexts/DataContext';
 import { Search, Eye, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'react-toastify';
+import AlertDialog from './AlertDialog'; // Added import
 
 const InvoiceHistory = () => {
   const { invoiceHistory, deleteInvoiceHistory } = useData();
@@ -14,6 +15,10 @@ const InvoiceHistory = () => {
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  
+  // State for delete confirmation dialog
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [invoiceToDelete, setInvoiceToDelete] = useState<{id: string, invoiceNumber: string} | null>(null);
 
   const filteredInvoices = invoiceHistory.filter(invoice => {
     if (!searchTerm) return true;
@@ -43,18 +48,32 @@ const InvoiceHistory = () => {
     setSelectedInvoice(null);
   };
 
-  const handleDeleteInvoice = async (invoiceId: string, invoiceNumber: string) => {
-    if (window.confirm(`Are you sure you want to delete invoice ${invoiceNumber}? This action cannot be undone.`)) {
-      setIsDeleting(true);
-      try {
-        await deleteInvoiceHistory(invoiceId);
-        toast.success(`Invoice ${invoiceNumber} deleted successfully!`);
-      } catch (error) {
-        console.error('Error deleting invoice:', error);
-        toast.error('Failed to delete invoice. Please try again.');
-      } finally {
-        setIsDeleting(false);
-      }
+  // Open delete confirmation dialog
+  const openDeleteDialog = (invoiceId: string, invoiceNumber: string) => {
+    setInvoiceToDelete({ id: invoiceId, invoiceNumber });
+    setIsDeleteDialogOpen(true);
+  };
+
+  // Close delete confirmation dialog
+  const closeDeleteDialog = () => {
+    setIsDeleteDialogOpen(false);
+    setInvoiceToDelete(null);
+  };
+
+  // Handle delete invoice
+  const handleDeleteInvoice = async () => {
+    if (!invoiceToDelete) return;
+    
+    setIsDeleting(true);
+    try {
+      await deleteInvoiceHistory(invoiceToDelete.id);
+      toast.success(`Invoice ${invoiceToDelete.invoiceNumber} deleted successfully!`);
+      closeDeleteDialog();
+    } catch (error) {
+      console.error('Error deleting invoice:', error);
+      toast.error('Failed to delete invoice. Please try again.');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -112,7 +131,7 @@ const InvoiceHistory = () => {
                       <Button 
                         size="sm" 
                         variant="destructive" 
-                        onClick={() => handleDeleteInvoice(invoice.id, invoice.invoiceNumber)}
+                        onClick={() => openDeleteDialog(invoice.id, invoice.invoiceNumber)}
                         disabled={isDeleting}
                       >
                         <Trash2 className="w-4 h-4 mr-1" />
@@ -150,9 +169,9 @@ const InvoiceHistory = () => {
                       {/* Logo */}
                       <div className="mb-4">
                         <img 
-                          src="/Slate Designers (black bg) .png" 
+                          src="/Black SD.png" 
                           alt="Company Logo" 
-                          className="h-16 object-contain"
+                          className="h-24 object-contain"
                         />
                       </div>
                       <h1 className="text-3xl font-bold text-blue-700">{selectedInvoice.businessName || 'Financial ERP'}</h1>
@@ -272,6 +291,20 @@ const InvoiceHistory = () => {
                   
                   {/* Footer */}
                   <div className="pt-8 text-center text-sm text-gray-500 border-t border-gray-300 mt-8">
+                    <div className="flex justify-between items-center mb-8">
+                      <div className="text-left">
+                        <p className="font-semibold">Authorized Signature</p>
+                        <img 
+                          src="/signature.png" 
+                          alt="Authorized Signature" 
+                          className="h-16 object-contain mt-2"
+                        />
+                      </div>
+                      <div className="text-right">
+                        <p className="font-semibold">For Slate Designers</p>
+                        <p className="mt-16">Authorized Signatory</p>
+                      </div>
+                    </div>
                     <p className="font-semibold">Thank you for your business!</p>
                     <p className="mt-1">Payment is due within 30 days</p>
                   </div>
@@ -290,6 +323,17 @@ const InvoiceHistory = () => {
             </div>
           </div>
         )}
+        
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog
+          isOpen={isDeleteDialogOpen}
+          onClose={closeDeleteDialog}
+          onConfirm={handleDeleteInvoice}
+          title="Delete Invoice"
+          description={`Are you sure you want to delete invoice ${invoiceToDelete?.invoiceNumber}? This action cannot be undone.`}
+          confirmText="Delete Invoice"
+          isDeleting={isDeleting}
+        />
       </CardContent>
     </Card>
   );

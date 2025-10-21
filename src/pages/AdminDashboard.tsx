@@ -24,12 +24,13 @@ import ServiceCharges from '@/components/admin/ServiceCharges';
 import InvoiceGeneration from '@/components/admin/InvoiceGeneration';
 import InvoiceHistory from '@/components/admin/InvoiceHistory';
 import ProfitLoss from '@/components/admin/ProfitLoss';
-import MessageUser from '@/components/admin/MessageUser'; // Add this import
+import MessageUser from '@/components/admin/MessageUser';
 import { useNavigate } from 'react-router-dom';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 const AdminDashboard = () => {
   const [activeSection, setActiveSection] = useState('analytics');
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
   const { unreadCount } = useNotification();
   const navigate = useNavigate();
 
@@ -62,7 +63,7 @@ const AdminDashboard = () => {
         return <InvoiceHistory />;
       case 'profit-loss':
         return <ProfitLoss />;
-      case 'messages': // Add this case
+      case 'messages':
         return <MessageUser />;
       default:
         return <FinancialOverview />;
@@ -79,8 +80,15 @@ const AdminDashboard = () => {
     { id: 'invoice-generation', label: 'Invoice Generation', icon: FileText },
     { id: 'invoice-history', label: 'Invoice History', icon: History },
     { id: 'profit-loss', label: 'Profit & Loss', icon: TrendingUp },
-    { id: 'messages', label: 'Messages', icon: Mail }, // Add this menu item
+    { id: 'messages', label: 'Messages', icon: Mail },
   ];
+
+  // Get user initials for avatar
+  const getUserInitials = (email: string | null) => {
+    if (!email) return 'AD';
+    const name = email.split('@')[0];
+    return name.length > 1 ? name.substring(0, 2).toUpperCase() : name.toUpperCase();
+  };
 
   return (
     <div className="flex h-screen bg-gray-50">
@@ -116,6 +124,18 @@ const AdminDashboard = () => {
           })}
         </nav>
         <div className="absolute bottom-0 w-64 p-4 border-t">
+          {/* Admin Info */}
+          <div className="flex items-center gap-3 mb-4 p-2 bg-muted rounded-lg">
+            <Avatar className="h-10 w-10">
+              <AvatarFallback>{getUserInitials(user?.email)}</AvatarFallback>
+            </Avatar>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium truncate">{user?.email || 'Admin User'}</p>
+              <p className="text-xs text-muted-foreground">Administrator</p>
+            </div>
+          </div>
+          
+          {/* Logout Button */}
           <Button 
             onClick={handleLogout}
             variant="outline" 

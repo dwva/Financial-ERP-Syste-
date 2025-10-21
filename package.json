@@ -14,7 +14,8 @@
     "fix-user": "tsx src/scripts/fixExistingUser.ts",
     "fix-all-users": "tsx src/scripts/fixAllUsers.ts",
     "test-expense": "tsx src/scripts/testExpense.ts",
-    "debug-expenses": "tsx src/scripts/debugExpenses.ts"
+    "debug-expenses": "tsx src/scripts/debugExpenses.ts",
+    "generate-excel-template": "tsx src/scripts/generateServiceChargeExcel.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

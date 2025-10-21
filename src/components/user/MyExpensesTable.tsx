@@ -4,6 +4,7 @@ import { useData } from '@/contexts/DataContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { 
   AlertDialog, 
@@ -15,13 +16,13 @@ import {
   AlertDialogHeader, 
   AlertDialogTitle 
 } from '@/components/ui/alert-dialog';
-import { Receipt, FileText, Image as ImageIcon, Trash2, Edit, Eye } from 'lucide-react';
+import { Receipt, FileText, Image as ImageIcon, Trash2, Edit, Eye, ArrowUpDown } from 'lucide-react';
 import { toast } from 'react-toastify';
 import EditExpenseForm from '@/components/user/EditExpenseForm';
 
 const MyExpensesTable = () => {
   const { user } = useAuth();
-  const { expenses, deleteExpense } = useData();
+  const { expenses, deleteExpense, refreshData } = useData();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [expenseToDelete, setExpenseToDelete] = useState<string | null>(null);
   const [editingExpense, setEditingExpense] = useState<any | null>(null);
@@ -79,9 +80,15 @@ const MyExpensesTable = () => {
               <CardDescription>Your expense history</CardDescription>
             </div>
           </div>
-          <div className="text-right">
-            <p className="text-sm text-muted-foreground">Total</p>
-            <p className="text-2xl font-bold text-accent">{formatAmount(totalExpenses)}</p>
+          <div className="flex items-center gap-4">
+            <Button variant="outline" onClick={refreshData} className="gap-2">
+              <ArrowUpDown className="w-4 h-4" />
+              Refresh
+            </Button>
+            <div className="text-right">
+              <p className="text-sm text-muted-foreground">Total</p>
+              <p className="text-2xl font-bold text-accent">{formatAmount(totalExpenses)}</p>
+            </div>
           </div>
         </div>
       </CardHeader>

@@ -415,7 +415,7 @@ const InvoiceGeneration = () => {
                       <img 
                         src="/Black SD.png" 
                         alt="Company Logo" 
-                        className="h-60 object-contain"
+                        className="h-24 object-contain"
                       />
                     </div>
                     <h1 className="text-3xl font-bold text-blue-700">{invoiceData.businessName}</h1>
@@ -523,6 +523,20 @@ const InvoiceGeneration = () => {
                 
                 {/* Footer */}
                 <div className="pt-8 text-center text-sm text-gray-500 border-t border-gray-300 mt-8">
+                  <div className="flex justify-between items-center mb-8">
+                    <div className="text-left">
+                      <p className="font-semibold">Authorized Signature</p>
+                      <img 
+                        src="/signature.png" 
+                        alt="Authorized Signature" 
+                        className="h-16 object-contain mt-2"
+                      />
+                    </div>
+                    <div className="text-right">
+                      <p className="font-semibold">For Slate Designers</p>
+                      <p className="mt-16">Authorized Signatory</p>
+                    </div>
+                  </div>
                   <p className="font-semibold">Thank you for your business!</p>
                   <p className="mt-1">Payment is due within 30 days</p>
                 </div>

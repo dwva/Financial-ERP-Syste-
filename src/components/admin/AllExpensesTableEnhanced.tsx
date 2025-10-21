@@ -47,7 +47,7 @@ type SortOrder = 'asc' | 'desc';
 
 const AllExpensesTableEnhanced = () => {
   const { user: currentUser } = useAuth();
-  const { expenses, employees, deleteExpense, addExpense } = useData();
+  const { expenses, employees, deleteExpense, addExpense, refreshData } = useData();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterEmployee, setFilterEmployee] = useState<string>('all');
   const [filterMonth, setFilterMonth] = useState<string>('all');
@@ -326,10 +326,16 @@ const AllExpensesTableEnhanced = () => {
                 </CardDescription>
               </div>
             </div>
-            <Button className="gap-2" onClick={() => setIsAddExpenseDialogOpen(true)}>
-              <PlusCircle className="w-4 h-4" />
-              Add Expense
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={refreshData} className="gap-2">
+                <ArrowUpDown className="w-4 h-4" />
+                Refresh
+              </Button>
+              <Button className="gap-2" onClick={() => setIsAddExpenseDialogOpen(true)}>
+                <PlusCircle className="w-4 h-4" />
+                Add Expense
+              </Button>
+            </div>
           </div>
           
           {/* Filter Section */}
