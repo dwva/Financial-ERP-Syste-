@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useData } from '@/contexts/DataContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -37,7 +37,9 @@ interface ExpenseForm {
   date: string;
   company: string;
   clientName: string;
+  candidateName: string; // Add this line
   sector: string;
+  serviceName: string; // Add this line
 }
 
 type SortField = 'employee' | 'amount' | 'date' | 'description';
@@ -59,6 +61,7 @@ const AllExpensesTableEnhanced = () => {
   const [isViewExpenseDialogOpen, setIsViewExpenseDialogOpen] = useState(false);
   const [selectedExpense, setSelectedExpense] = useState<any>(null);
   const [expandedClients, setExpandedClients] = useState<Record<string, boolean>>({});
+  const [allExpanded, setAllExpanded] = useState<boolean>(false);
   const [newExpense, setNewExpense] = useState<ExpenseForm>({
     userId: '',
     amount: '',
@@ -66,7 +69,9 @@ const AllExpensesTableEnhanced = () => {
     date: '',
     company: '',
     clientName: '',
-    sector: ''
+    candidateName: '', // Add this line
+    sector: '',
+    serviceName: '' // Add this line
   });
 
   // Set default employee to current admin user when dialog opens
@@ -164,12 +169,19 @@ const AllExpensesTableEnhanced = () => {
     const groups: Record<string, any[]> = {};
     
     filteredAndSortedExpenses.forEach(expense => {
-      const clientName = expense.clientName || 'Unknown Client';
+      // Normalize client name to handle case and whitespace differences
+      const clientName = expense.clientName 
+        ? expense.clientName.trim() 
+        : 'Unknown Client';
+      
       if (!groups[clientName]) {
         groups[clientName] = [];
       }
       groups[clientName].push(expense);
     });
+    
+    // Debug logging to see grouping
+    console.log('Grouped expenses by client:', groups);
     
     return groups;
   }, [filteredAndSortedExpenses]);
@@ -188,6 +200,15 @@ const AllExpensesTableEnhanced = () => {
       ...prev,
       [clientName]: !prev[clientName]
     }));
+  };
+
+  const toggleAllExpansion = () => {
+    const newExpandedState: Record<string, boolean> = {};
+    Object.keys(groupedExpenses).forEach(clientName => {
+      newExpandedState[clientName] = !allExpanded;
+    });
+    setExpandedClients(newExpandedState);
+    setAllExpanded(!allExpanded);
   };
 
   const getFileIcon = (fileName: string | null) => {
@@ -233,35 +254,32 @@ const AllExpensesTableEnhanced = () => {
   };
 
   const handleAddExpense = async () => {
-    if (!newExpense.amount || !newExpense.description || !newExpense.date || !newExpense.clientName) {
+    if (!newExpense.userId || !newExpense.amount || !newExpense.date || 
+        !newExpense.company || !newExpense.clientName || !newExpense.candidateName || // Add candidateName validation
+        !newExpense.sector || !newExpense.description || !newExpense.serviceName) {
       toast.error('Please fill in all required fields');
       return;
     }
     
-    // Use current user's email if no user is selected
-    const userId = newExpense.userId || currentUser?.email || '';
-    
-    if (!userId) {
-      toast.error('Please select an employee or ensure you are logged in');
-      return;
-    }
-    
     try {
-      const expenseData = {
-        userId,
+      await addExpense({
+        userId: newExpense.userId,
         amount: parseFloat(newExpense.amount),
         description: newExpense.description,
+        date: newExpense.date,
+        company: newExpense.company,
+        clientName: newExpense.clientName,
+        candidateName: newExpense.candidateName, // Add candidateName
+        sector: newExpense.sector,
+        serviceName: newExpense.serviceName, // Add serviceName
         file: null,
         fileName: null,
-        date: newExpense.date,
-        company: newExpense.company || '',
-        clientName: newExpense.clientName || '',
-        sector: newExpense.sector || '',
-        timestamp: new Date().toISOString()
-      };
+      });
       
-      await addExpense(expenseData);
+      toast.success('Expense added successfully!');
       setIsAddExpenseDialogOpen(false);
+      
+      // Reset form
       setNewExpense({
         userId: '',
         amount: '',
@@ -269,12 +287,13 @@ const AllExpensesTableEnhanced = () => {
         date: '',
         company: '',
         clientName: '',
-        sector: ''
+        candidateName: '', // Add this line
+        sector: '',
+        serviceName: '' // Reset service name
       });
-      toast.success('Expense added successfully!');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error adding expense:', error);
-      toast.error('Failed to add expense. Please try again.');
+      toast.error(`Failed to add expense: ${error.message || 'Please try again'}`);
     }
   };
 
@@ -314,7 +333,7 @@ const AllExpensesTableEnhanced = () => {
           </div>
           
           {/* Filter Section */}
-          <div className="flex flex-wrap gap-4 p-4 bg-muted/50 rounded-lg">
+          <div className="flex flex-wrap gap-4 p-4 bg-muted/50 rounded-lg items-center">
             <div className="flex-1 min-w-[200px]">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -371,10 +390,13 @@ const AllExpensesTableEnhanced = () => {
               </Select>
             </div>
             
-            <div className="flex items-center">
+            <div className="flex items-center gap-2">
               <Button variant="outline" onClick={clearFilters} className="gap-2">
                 <Filter className="w-4 h-4" />
                 Clear Filters
+              </Button>
+              <Button variant="outline" onClick={toggleAllExpansion}>
+                {allExpanded ? 'Collapse All' : 'Expand All'}
               </Button>
             </div>
           </div>
@@ -420,6 +442,7 @@ const AllExpensesTableEnhanced = () => {
                   </Button>
                 </TableHead>
                 <TableHead>Client Name</TableHead>
+                <TableHead>Candidate Name</TableHead>
                 <TableHead>Sector</TableHead>
                 <TableHead>File</TableHead>
                 <TableHead>
@@ -439,46 +462,46 @@ const AllExpensesTableEnhanced = () => {
             <TableBody>
               {Object.keys(groupedExpenses).length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
                     No expenses found
                   </TableCell>
                 </TableRow>
               ) : (
-                Object.entries(groupedExpenses).map(([company, companyExpenses]) => (
-                  <>
+                Object.entries(groupedExpenses).map(([clientName, clientExpenses]) => (
+                  <React.Fragment key={clientName}>
                     {/* Client Group Header */}
-                    <TableRow key={company} className="bg-muted/50">
-                      <TableCell colSpan={9} className="font-bold py-3">
+                    <TableRow className="bg-muted/50">
+                      <TableCell colSpan={10} className="font-bold py-3">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => toggleClientExpansion(company)}
+                              onClick={() => toggleClientExpansion(clientName)}
                               className="p-1 h-6 w-6 mr-2"
                             >
-                              {expandedClients[company] ? (
+                              {expandedClients[clientName] ? (
                                 <ChevronDown className="w-4 h-4" />
                               ) : (
                                 <ChevronRight className="w-4 h-4" />
                               )}
                             </Button>
-                            <span>Client: {company}</span>
+                            <span>Client: {clientName}</span>
                             <Badge variant="secondary" className="ml-2">
-                              {companyExpenses.length} expenses
+                              {clientExpenses.length} expenses
                             </Badge>
                           </div>
                           <div className="text-right">
                             <Badge variant="outline">
-                              Total: {formatAmount(companyExpenses.reduce((sum, exp) => sum + exp.amount, 0))}
+                              Total: {formatAmount(clientExpenses.reduce((sum, exp) => sum + exp.amount, 0))}
                             </Badge>
                           </div>
                         </div>
                       </TableCell>
                     </TableRow>
                     
-                    {/* Company Expenses */}
-                    {expandedClients[company] && companyExpenses.map((expense) => {
+                    {/* Client Expenses */}
+                    {expandedClients[clientName] && clientExpenses.map((expense) => {
                       const employee = employees.find(emp => emp.email === expense.userId);
                       return (
                         <TableRow key={expense.id}>
@@ -500,6 +523,7 @@ const AllExpensesTableEnhanced = () => {
                           </TableCell>
                           <TableCell>{expense.description}</TableCell>
                           <TableCell>{expense.clientName || 'N/A'}</TableCell>
+                          <TableCell>{expense.candidateName || 'N/A'}</TableCell>
                           <TableCell>{expense.sector || 'N/A'}</TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2">
@@ -535,7 +559,7 @@ const AllExpensesTableEnhanced = () => {
                         </TableRow>
                       );
                     })}
-                  </>
+                  </React.Fragment>
                 ))
               )}
             </TableBody>
@@ -632,6 +656,16 @@ const AllExpensesTableEnhanced = () => {
             
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
+                <label htmlFor="candidateName" className="text-sm font-medium">Candidate Name</label>
+                <Input
+                  id="candidateName"
+                  placeholder="Candidate name"
+                  value={newExpense.candidateName || ''}
+                  onChange={(e) => setNewExpense({...newExpense, candidateName: e.target.value})}
+                />
+              </div>
+              
+              <div className="space-y-2">
                 <label htmlFor="company" className="text-sm font-medium">Company</label>
                 <Input
                   id="company"
@@ -640,7 +674,9 @@ const AllExpensesTableEnhanced = () => {
                   onChange={(e) => setNewExpense({...newExpense, company: e.target.value})}
                 />
               </div>
-              
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label htmlFor="sector" className="text-sm font-medium">Sector</label>
                 <Input
@@ -650,7 +686,19 @@ const AllExpensesTableEnhanced = () => {
                   onChange={(e) => setNewExpense({...newExpense, sector: e.target.value})}
                 />
               </div>
+              
+              <div className="space-y-2">
+                <label htmlFor="serviceName" className="text-sm font-medium">Service Name *</label>
+                <Input
+                  id="serviceName"
+                  placeholder="Service name"
+                  value={newExpense.serviceName || ''}
+                  onChange={(e) => setNewExpense({...newExpense, serviceName: e.target.value})}
+                  required
+                />
+              </div>
             </div>
+
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsAddExpenseDialogOpen(false)}>
@@ -707,6 +755,10 @@ const AllExpensesTableEnhanced = () => {
                 <div>
                   <p className="text-sm text-muted-foreground">Client Name</p>
                   <p className="font-medium">{selectedExpense.clientName || 'N/A'}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Candidate Name</p>
+                  <p className="font-medium">{selectedExpense.candidateName || 'N/A'}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Company</p>

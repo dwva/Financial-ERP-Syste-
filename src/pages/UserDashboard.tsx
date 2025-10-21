@@ -14,9 +14,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import AddExpenseForm from '@/components/user/AddExpenseForm';
 import MyExpensesTable from '@/components/user/MyExpensesTable';
-import { LogOut, Wallet, User, Calendar, Building, Hash, Camera } from 'lucide-react';
+import MessagesPage from '@/components/user/MessagesPage'; // Add this import
+import { LogOut, Wallet, User, Calendar, Building, Hash, Camera, Mail } from 'lucide-react';
 
 const UserDashboard = () => {
   const { user, logout } = useAuth();
@@ -240,10 +242,29 @@ const UserDashboard = () => {
       </header>
 
       <main className="container mx-auto px-4 py-8">
-        <div className="space-y-6">
-          <AddExpenseForm />
-          <MyExpensesTable />
-        </div>
+        <Tabs defaultValue="expenses" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="expenses" className="flex items-center gap-2">
+              <Wallet className="w-4 h-4" />
+              My Expenses
+            </TabsTrigger>
+            <TabsTrigger value="messages" className="flex items-center gap-2">
+              <Mail className="w-4 h-4" />
+              Messages
+            </TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="expenses">
+            <div className="space-y-6">
+              <AddExpenseForm />
+              <MyExpensesTable />
+            </div>
+          </TabsContent>
+          
+          <TabsContent value="messages">
+            <MessagesPage />
+          </TabsContent>
+        </Tabs>
       </main>
     </div>
   );

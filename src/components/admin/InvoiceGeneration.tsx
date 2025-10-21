@@ -9,6 +9,7 @@ import { Download, FileText, Search } from 'lucide-react';
 import { useData } from '@/contexts/DataContext';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import { getCompanyNamesFromExpenses } from '@/utils/expenseUtils';
 
 interface InvoiceItem {
   id: string;
@@ -20,7 +21,7 @@ interface InvoiceItem {
 }
 
 const InvoiceGeneration = () => {
-  const { employees, serviceCharges, addInvoiceHistory } = useData();
+  const { employees, expenses, serviceCharges, addInvoiceHistory } = useData();
   const [invoiceData, setInvoiceData] = useState({
     companyName: '',
     candidateName: '',
@@ -269,12 +270,28 @@ const InvoiceGeneration = () => {
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="companyName">Company Name (TO) *</Label>
-                <Input
-                  id="companyName"
-                  placeholder="Enter company name"
-                  value={invoiceData.companyName}
-                  onChange={(e) => handleInputChange('companyName', e.target.value)}
-                />
+                <div className="flex gap-2">
+                  <Input
+                    id="companyName"
+                    placeholder="Enter company name"
+                    value={invoiceData.companyName}
+                    onChange={(e) => handleInputChange('companyName', e.target.value)}
+                    list="company-names"
+                    className="flex-1"
+                  />
+                  {expenses.length > 0 && (
+                    <datalist id="company-names">
+                      {getCompanyNamesFromExpenses(expenses).map((companyName, index) => (
+                        <option key={index} value={companyName} />
+                      ))}
+                    </datalist>
+                  )}
+                </div>
+                {expenses.length > 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    Start typing to see company names from your expenses
+                  </p>
+                )}
               </div>
               
               <div className="space-y-2">
@@ -396,9 +413,9 @@ const InvoiceGeneration = () => {
                     {/* Logo */}
                     <div className="mb-4">
                       <img 
-                        src="/Slate Designers (black bg) .png" 
+                        src="/Black SD.png" 
                         alt="Company Logo" 
-                        className="h-16 object-contain"
+                        className="h-60 object-contain"
                       />
                     </div>
                     <h1 className="text-3xl font-bold text-blue-700">{invoiceData.businessName}</h1>

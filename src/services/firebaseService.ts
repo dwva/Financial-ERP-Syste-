@@ -10,7 +10,8 @@ import {
   query, 
   where, 
   orderBy,
-  getDoc
+  getDoc,
+  onSnapshot // Add this import for real-time listeners
 } from 'firebase/firestore';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
 import { Employee, Expense } from '@/contexts/DataContext';
@@ -21,6 +22,8 @@ const expensesCollection = collection(db, 'expenses');
 const invoicesCollection = collection(db, 'invoices');
 const serviceChargesCollection = collection(db, 'serviceCharges');
 const invoiceHistoryCollection = collection(db, 'invoiceHistory');
+const profitLossCollection = collection(db, 'profitLossReports');
+const messagesCollection = collection(db, 'messages');
 
 // Authentication operations
 export const createAdminUser = async (email: string, password: string) => {
@@ -173,6 +176,22 @@ export const createExpense = async (expense: any) => {
     console.error('Error creating expense:', error);
     throw error;
   }
+};
+
+// Add real-time listener for expenses
+export const onExpensesChange = (callback: (expenses: Expense[]) => void) => {
+  return onSnapshot(expensesCollection, 
+    (querySnapshot) => {
+      const expenses = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...(doc.data() as any)
+      })) as unknown as Expense[];
+      callback(expenses);
+    },
+    (error) => {
+      console.error('Error in expenses listener:', error);
+    }
+  );
 };
 
 export const getExpenses = async () => {
@@ -357,6 +376,22 @@ export const createInvoiceHistory = async (invoice: any) => {
   }
 };
 
+// Add real-time listener for invoice history
+export const onInvoiceHistoryChange = (callback: (invoices: any[]) => void) => {
+  return onSnapshot(invoiceHistoryCollection, 
+    (querySnapshot) => {
+      const invoices = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...(doc.data() as any)
+      }));
+      callback(invoices);
+    },
+    (error) => {
+      console.error('Error in invoice history listener:', error);
+    }
+  );
+};
+
 export const getInvoiceHistory = async () => {
   try {
     const querySnapshot = await getDocs(invoiceHistoryCollection);
@@ -403,6 +438,81 @@ export const deleteInvoiceHistory = async (id: string) => {
     return id;
   } catch (error) {
     console.error('Error deleting invoice history:', error);
+    throw error;
+  }
+};
+
+// Profit/Loss operations
+export const createProfitLossReport = async (report: any) => {
+  try {
+    const docRef = await addDoc(profitLossCollection, report);
+    return { id: docRef.id, ...report };
+  } catch (error) {
+    console.error('Error creating profit/loss report:', error);
+    throw error;
+  }
+};
+
+export const getProfitLossReports = async () => {
+  try {
+    const querySnapshot = await getDocs(profitLossCollection);
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...(doc.data() as any)
+    }));
+  } catch (error) {
+    console.error('Error fetching profit/loss reports:', error);
+    throw error;
+  }
+};
+
+export const getProfitLossReportById = async (id: string) => {
+  try {
+    const reportDoc = doc(db, 'profitLossReports', id);
+    const docSnap = await getDoc(reportDoc);
+    if (docSnap.exists()) {
+      return { id: docSnap.id, ...(docSnap.data() as any) };
+    } else {
+      throw new Error('Profit/Loss report not found');
+    }
+  } catch (error) {
+    console.error('Error fetching profit/loss report:', error);
+    throw error;
+  }
+};
+
+export const updateProfitLossReport = async (id: string, report: Partial<any>) => {
+  try {
+    const reportDoc = doc(db, 'profitLossReports', id);
+    await updateDoc(reportDoc, report);
+    return { id, ...report };
+  } catch (error) {
+    console.error('Error updating profit/loss report:', error);
+    throw error;
+  }
+};
+
+export const deleteProfitLossReport = async (id: string) => {
+  try {
+    const reportDoc = doc(db, 'profitLossReports', id);
+    await deleteDoc(reportDoc);
+    return id;
+  } catch (error) {
+    console.error('Error deleting profit/loss report:', error);
+    throw error;
+  }
+};
+
+// Get all messages (for debugging purposes)
+export const getAllMessages = async () => {
+  try {
+    const querySnapshot = await getDocs(messagesCollection);
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...(doc.data() as any)
+    }));
+  } catch (error) {
+    console.error('Error fetching all messages:', error);
     throw error;
   }
 };

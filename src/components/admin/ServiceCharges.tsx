@@ -199,7 +199,7 @@ const ServiceCharges = () => {
     }
   };
 
-  // Handle Excel file import with enhanced structure recognition
+  // Handle Excel file import with enhanced structure recognition for sector-service-amount format
   const handleExcelImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -262,50 +262,83 @@ const ServiceCharges = () => {
       // Process data based on structure - create sector data
       const sectorData: ExcelSectorData[] = [];
       
-      // For your structure: 10 columns, each containing service/amount data
-      const maxColumns = Math.min(headers.length, 10);
-      for (let colIndex = 0; colIndex < maxColumns; colIndex++) {
-        const sectorName = headers[colIndex];
-        const services: { name: string; amount: number }[] = [];
+      // Check if the Excel file follows the sector-service-amount format (3 columns)
+      if (headers.length >= 3) {
+        // Group data by sector from the first column
+        const sectorMap: Record<string, { name: string; amount: number }[]> = {};
         
-        // Process each row in this column
-        for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
-          const row = rows[rowIndex];
-          
-          // Check if this row has data for this column
-          if (row.length > colIndex) {
-            const cellValue = row[colIndex];
-            if (cellValue !== null && cellValue !== undefined && cellValue !== '') {
-              // Parse the cell value as service,amount pair
-              const stringValue = String(cellValue).trim();
+        rows.forEach(row => {
+          if (row.length >= 3) {
+            const sectorValue = row[0];
+            const serviceValue = row[1];
+            const amountValue = row[2];
+            
+            // Validate that we have values
+            if (sectorValue !== null && sectorValue !== undefined && sectorValue !== '' &&
+                serviceValue !== null && serviceValue !== undefined && serviceValue !== '') {
+              const sectorName = String(sectorValue).trim();
+              const serviceName = String(serviceValue).trim();
+              const amount = parseFloat(String(amountValue)) || 0;
               
-              // If it contains a comma, split as service,amount
-              if (stringValue.includes(',')) {
-                const parts = stringValue.split(',');
-                if (parts.length >= 2) {
-                  const serviceName = parts[0].trim();
-                  const amountValue = parts[1].trim();
-                  const amount = parseFloat(amountValue) || 0;
-                  
-                  if (serviceName) {
-                    services.push({ name: serviceName, amount });
-                  }
-                }
-              } 
-              // If it's a number, treat as amount (but we need a service name)
-              else if (!isNaN(parseFloat(stringValue))) {
-                // This is just an amount, we need to pair it with a service
-                // For now, we'll skip standalone amounts
+              if (!sectorMap[sectorName]) {
+                sectorMap[sectorName] = [];
               }
-              // Otherwise treat as service name with 0 amount
-              else {
-                services.push({ name: stringValue, amount: 0 });
+              
+              sectorMap[sectorName].push({ name: serviceName, amount });
+            }
+          }
+        });
+        
+        // Convert to ExcelSectorData format
+        Object.entries(sectorMap).forEach(([sectorName, services]) => {
+          sectorData.push({ sectorName, services });
+        });
+      } else {
+        // Fallback to the previous column-based approach for other formats
+        const maxColumns = Math.min(headers.length, 10);
+        for (let colIndex = 0; colIndex < maxColumns; colIndex++) {
+          const sectorName = headers[colIndex];
+          const services: { name: string; amount: number }[] = [];
+          
+          // Process each row in this column
+          for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
+            const row = rows[rowIndex];
+            
+            // Check if this row has data for this column
+            if (row.length > colIndex) {
+              const cellValue = row[colIndex];
+              if (cellValue !== null && cellValue !== undefined && cellValue !== '') {
+                // Parse the cell value as service,amount pair
+                const stringValue = String(cellValue).trim();
+                
+                // If it contains a comma, split as service,amount
+                if (stringValue.includes(',')) {
+                  const parts = stringValue.split(',');
+                  if (parts.length >= 2) {
+                    const serviceName = parts[0].trim();
+                    const amountValue = parts[1].trim();
+                    const amount = parseFloat(amountValue) || 0;
+                    
+                    if (serviceName) {
+                      services.push({ name: serviceName, amount });
+                    }
+                  }
+                } 
+                // If it's a number, treat as amount (but we need a service name)
+                else if (!isNaN(parseFloat(stringValue))) {
+                  // This is just an amount, we need to pair it with a service
+                  // For now, we'll skip standalone amounts
+                }
+                // Otherwise treat as service name with 0 amount
+                else {
+                  services.push({ name: stringValue, amount: 0 });
+                }
               }
             }
           }
+          
+          sectorData.push({ sectorName, services });
         }
-        
-        sectorData.push({ sectorName, services });
       }
       
       setExcelSectorData(sectorData);
@@ -450,7 +483,7 @@ const ServiceCharges = () => {
                     <p className="text-sm text-gray-600 mb-2">
                       Excel file can have:
                       <br />
-                      • Two columns: Service Name and Amount
+                      • Three columns: Sector Name, Service Name, Amount
                       <br />
                       • Multiple columns: Headers as service names
                     </p>
@@ -468,10 +501,11 @@ const ServiceCharges = () => {
                   <div className="text-sm text-muted-foreground">
                     <p className="font-medium">Format Requirements:</p>
                     <ul className="list-disc pl-5 space-y-1 mt-1">
-                      <li>First row: Headers (service names)</li>
-                      <li>Subsequent rows: Service data</li>
-                      <li>For 2-column format: Column 1 = Service Name, Column 2 = Amount</li>
-                      <li>Example: Visa, 150000</li>
+                      <li>First row: Headers (Sector Name, Service Name, Amount)</li>
+                      <li>Subsequent rows: Sector, Service, and Amount data</li>
+                      <li>For 3-column format: Column 1 = Sector Name, Column 2 = Service Name, Column 3 = Amount</li>
+                      <li>Example: Tourism, Camping, 8000</li>
+                      <li>For multiple columns: Headers as service names, rows with service,amount pairs</li>
                     </ul>
                   </div>
                 </div>
@@ -494,7 +528,7 @@ const ServiceCharges = () => {
                 <DialogHeader>
                   <DialogTitle>Bulk Import Service Charges</DialogTitle>
                   <DialogDescription>
-                    Paste your service charge data in the format: "Sector, Service Name, Amount" or "Service Name, Amount" (one per line)
+                    Paste your service charge data in the format: "Sector, Service Name, Amount" (one per line)
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4">
@@ -502,7 +536,7 @@ const ServiceCharges = () => {
                     <Label htmlFor="bulkData">Service Charge Data</Label>
                     <Textarea
                       id="bulkData"
-                      placeholder="Enter service charges in the format: Sector, Service Name, Amount&#10;Or: Service Name, Amount&#10;Example:&#10;Immigration, Visa Processing, 1500&#10;Immigration, Passport, 800&#10;Travel, Air Ticket, 1300&#10;Accommodation, Hotel Booking, 500&#10;Transportation, Airport Transfer, 250"
+                      placeholder="Enter service charges in the format: Sector, Service Name, Amount&#10;Example:&#10;Immigration, Visa Processing, 1500&#10;Immigration, Passport, 800&#10;Travel, Air Ticket, 1300&#10;Accommodation, Hotel Booking, 500&#10;Transportation, Airport Transfer, 250"
                       value={bulkImportData}
                       onChange={(e) => setBulkImportData(e.target.value)}
                       rows={10}
@@ -513,12 +547,10 @@ const ServiceCharges = () => {
                     <p className="font-medium">Format Instructions:</p>
                     <ul className="list-disc pl-5 space-y-1 mt-1">
                       <li>Enter one service charge per line</li>
-                      <li>Format 1: "Sector, Service Name, Amount" (three values) - Recommended</li>
-                      <li>Format 2: "Service Name, Amount" (two values, no sector)</li>
+                      <li>Format: "Sector, Service Name, Amount" (three values) - Recommended</li>
                       <li>Separate values with commas</li>
                       <li>Amount should be a number (no currency symbols)</li>
-                      <li>Example with sectors: "Immigration, Visa Processing, 1500"</li>
-                      <li>Example without sectors: "Visa Processing, 1500"</li>
+                      <li>Example: "Immigration, Visa Processing, 1500"</li>
                     </ul>
                   </div>
                 </div>

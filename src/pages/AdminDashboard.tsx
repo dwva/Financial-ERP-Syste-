@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useNotification } from '@/contexts/NotificationContext';
 import { Button } from '@/components/ui/button';
 import { 
   LayoutDashboard, 
@@ -10,7 +11,9 @@ import {
   Settings, 
   LogOut,
   FileSpreadsheet,
-  History
+  History,
+  TrendingUp,
+  Mail
 } from 'lucide-react';
 import FinancialOverview from '@/components/admin/FinancialOverview';
 import AllExpensesTableEnhanced from '@/components/admin/AllExpensesTableEnhanced';
@@ -20,12 +23,14 @@ import NotificationPage from '@/components/admin/NotificationPage';
 import ServiceCharges from '@/components/admin/ServiceCharges';
 import InvoiceGeneration from '@/components/admin/InvoiceGeneration';
 import InvoiceHistory from '@/components/admin/InvoiceHistory';
-// ExcelImportSection import removed
+import ProfitLoss from '@/components/admin/ProfitLoss';
+import MessageUser from '@/components/admin/MessageUser'; // Add this import
 import { useNavigate } from 'react-router-dom';
 
 const AdminDashboard = () => {
   const [activeSection, setActiveSection] = useState('analytics');
   const { logout } = useAuth();
+  const { unreadCount } = useNotification();
   const navigate = useNavigate();
 
   const handleLogout = async () => {
@@ -55,7 +60,10 @@ const AdminDashboard = () => {
         return <InvoiceGeneration />;
       case 'invoice-history':
         return <InvoiceHistory />;
-      // Excel import case removed
+      case 'profit-loss':
+        return <ProfitLoss />;
+      case 'messages': // Add this case
+        return <MessageUser />;
       default:
         return <FinancialOverview />;
     }
@@ -70,7 +78,8 @@ const AdminDashboard = () => {
     { id: 'service-charges', label: 'Service Charges', icon: FileSpreadsheet },
     { id: 'invoice-generation', label: 'Invoice Generation', icon: FileText },
     { id: 'invoice-history', label: 'Invoice History', icon: History },
-    // Excel import menu item removed
+    { id: 'profit-loss', label: 'Profit & Loss', icon: TrendingUp },
+    { id: 'messages', label: 'Messages', icon: Mail }, // Add this menu item
   ];
 
   return (
@@ -94,7 +103,14 @@ const AdminDashboard = () => {
                 }`}
               >
                 <Icon className="w-5 h-5 mr-3" />
-                {item.label}
+                <span className="flex items-center">
+                  {item.label}
+                  {item.id === 'notifications' && unreadCount > 0 && (
+                    <span className="ml-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                      {unreadCount}
+                    </span>
+                  )}
+                </span>
               </button>
             );
           })}

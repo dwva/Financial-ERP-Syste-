@@ -4,14 +4,16 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useData } from '@/contexts/DataContext';
-import { Search, Eye } from 'lucide-react';
+import { Search, Eye, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
+import { toast } from 'react-toastify';
 
 const InvoiceHistory = () => {
-  const { invoiceHistory } = useData();
+  const { invoiceHistory, deleteInvoiceHistory } = useData();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const filteredInvoices = invoiceHistory.filter(invoice => {
     if (!searchTerm) return true;
@@ -39,6 +41,21 @@ const InvoiceHistory = () => {
   const closeModal = () => {
     setIsModalOpen(false);
     setSelectedInvoice(null);
+  };
+
+  const handleDeleteInvoice = async (invoiceId: string, invoiceNumber: string) => {
+    if (window.confirm(`Are you sure you want to delete invoice ${invoiceNumber}? This action cannot be undone.`)) {
+      setIsDeleting(true);
+      try {
+        await deleteInvoiceHistory(invoiceId);
+        toast.success(`Invoice ${invoiceNumber} deleted successfully!`);
+      } catch (error) {
+        console.error('Error deleting invoice:', error);
+        toast.error('Failed to delete invoice. Please try again.');
+      } finally {
+        setIsDeleting(false);
+      }
+    }
   };
 
   return (
@@ -83,14 +100,25 @@ const InvoiceHistory = () => {
                   <TableCell>{invoice.candidateName || '-'}</TableCell>
                   <TableCell>{formatAmount(invoice.total)}</TableCell>
                   <TableCell>
-                    <Button 
-                      size="sm" 
-                      variant="outline" 
-                      onClick={() => viewInvoiceDetails(invoice)}
-                    >
-                      <Eye className="w-4 h-4 mr-1" />
-                      View
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        onClick={() => viewInvoiceDetails(invoice)}
+                      >
+                        <Eye className="w-4 h-4 mr-1" />
+                        View
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="destructive" 
+                        onClick={() => handleDeleteInvoice(invoice.id, invoice.invoiceNumber)}
+                        disabled={isDeleting}
+                      >
+                        <Trash2 className="w-4 h-4 mr-1" />
+                        Delete
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -119,6 +147,14 @@ const InvoiceHistory = () => {
                   {/* Company Header */}
                   <div className="flex justify-between items-start pb-6 border-b-2 border-gray-300">
                     <div>
+                      {/* Logo */}
+                      <div className="mb-4">
+                        <img 
+                          src="/Slate Designers (black bg) .png" 
+                          alt="Company Logo" 
+                          className="h-16 object-contain"
+                        />
+                      </div>
                       <h1 className="text-3xl font-bold text-blue-700">{selectedInvoice.businessName || 'Financial ERP'}</h1>
                       <p className="text-gray-600 mt-1">{selectedInvoice.businessTagline || 'Business Solutions'}</p>
                       <div className="mt-4 text-sm text-gray-600">
@@ -127,6 +163,9 @@ const InvoiceHistory = () => {
                         <p>{selectedInvoice.businessCountry || 'India'}</p>
                         <p className="mt-1">Email: {selectedInvoice.businessEmail || 'info@financiaerpsys.com'}</p>
                         <p>Phone: {selectedInvoice.businessPhone || '+91 98765 43210'}</p>
+                        {selectedInvoice.businessGST && (
+                          <p>{selectedInvoice.businessGST}</p>
+                        )}
                       </div>
                     </div>
                     <div className="text-right">
@@ -167,6 +206,7 @@ const InvoiceHistory = () => {
                       <thead>
                         <tr className="bg-gray-100">
                           <th className="border border-gray-300 py-3 px-4 text-left font-semibold">Description</th>
+                          <th className="border border-gray-300 py-3 px-4 text-left font-semibold">Sector</th>
                           <th className="border border-gray-300 py-3 px-4 text-right font-semibold">Quantity</th>
                           <th className="border border-gray-300 py-3 px-4 text-right font-semibold">Unit Price</th>
                           <th className="border border-gray-300 py-3 px-4 text-right font-semibold">Amount</th>
@@ -176,6 +216,7 @@ const InvoiceHistory = () => {
                         {selectedInvoice.items?.map((item: any, index: number) => (
                           <tr key={index}>
                             <td className="border border-gray-300 py-3 px-4">{item.description}</td>
+                            <td className="border border-gray-300 py-3 px-4">{item.sector || 'N/A'}</td>
                             <td className="border border-gray-300 py-3 px-4 text-right">{item.quantity || 1}</td>
                             <td className="border border-gray-300 py-3 px-4 text-right">{formatAmount(item.amount)}</td>
                             <td className="border border-gray-300 py-3 px-4 text-right">{formatAmount((item.amount || 0) * (item.quantity || 1))}</td>
@@ -233,6 +274,12 @@ const InvoiceHistory = () => {
                   <div className="pt-8 text-center text-sm text-gray-500 border-t border-gray-300 mt-8">
                     <p className="font-semibold">Thank you for your business!</p>
                     <p className="mt-1">Payment is due within 30 days</p>
+                  </div>
+                  
+                  {/* Additional Text Lines */}
+                  <div className="pt-4 text-center text-xs text-gray-500">
+                    <p>This is a computer generated invoice</p>
+                    <p>No signature required</p>
                   </div>
                 </div>
                 

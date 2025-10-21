@@ -76,6 +76,23 @@ The application uses the following Firestore collections:
 }
 ```
 
+### Messages Collection
+```javascript
+{
+  id: string,
+  senderId: string,
+  senderName: string,
+  receiverId: string,
+  receiverName: string,
+  subject: string,
+  content: string,
+  fileUrl: string (optional),
+  fileName: string (optional),
+  timestamp: timestamp,
+  read: boolean
+}
+```
+
 ## Security Rules
 
 For development, you can use these basic Firestore rules in the Firebase Console:

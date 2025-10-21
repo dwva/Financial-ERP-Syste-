@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'react-toastify';
 import { Upload, FileSpreadsheet, Search, CheckCircle, PlusCircle } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { useData } from '@/contexts/DataContext'; // Add this import
+import { useData } from '@/contexts/DataContext';
 
 interface ExcelData {
   headers: string[];
@@ -44,7 +44,7 @@ const ExcelImportSection = () => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  // Handle Excel file import with enhanced sector grouping
+  // Handle Excel file import - Enhanced to correctly match the format: Sector Name, Service Name, Amount
   const handleExcelImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -114,15 +114,15 @@ const ExcelImportSection = () => {
       
       setExcelData({ headers, rows });
       
-      // Process data by sectors (first column) - Enhanced to group by sector name
+      // Process data by sectors - CORRECTED to match the expected format
       const sectorMap: SectorData = {};
       rows.forEach((row, index) => {
-        if (row && row.length > 0) {
-          // Use first column as sector, fallback to row index if empty
-          const sectorValue = row[0];
+        // Expecting format: [Sector Name, Service Name, Amount]
+        if (row && row.length >= 3) {
+          const sectorValue = row[0]; // First column: Sector Name
           const sector = (sectorValue !== null && sectorValue !== undefined && sectorValue !== '') 
-            ? String(sectorValue) 
-            : `Row ${index + 2}`; // +2 because we skipped header and index is 0-based
+            ? String(sectorValue).trim() 
+            : `Uncategorized`;
             
           if (!sectorMap[sector]) {
             sectorMap[sector] = [];
@@ -143,22 +143,17 @@ const ExcelImportSection = () => {
           if (row.length > headerIndex) {
             const cellValue = row[headerIndex];
             if (cellValue !== null && cellValue !== undefined && cellValue !== '') {
-              // Try to parse as service,amount pair
-              const stringValue = String(cellValue).trim();
-              
-              // If it contains a comma, split as service,amount
-              if (stringValue.includes(',')) {
-                const parts = stringValue.split(',');
-                if (parts.length >= 2) {
-                  const serviceName = parts[0].trim();
-                  const amountValue = parts[1].trim();
-                  const amount = parseFloat(amountValue) || 0;
-                  
-                  services.push({ name: serviceName, amount, row: rowIndex + 1 });
-                }
+              // For the service column (index 1), extract service name and amount
+              if (headerIndex === 1 && row.length >= 3) {
+                // Service name is in column 1, amount is in column 2
+                const serviceName = String(cellValue).trim();
+                const amountValue = row[2]; // Amount from column 2
+                const amount = parseFloat(String(amountValue)) || 0;
+                
+                services.push({ name: serviceName, amount, row: rowIndex + 1 });
               } else {
-                // Treat as service name with 0 amount
-                services.push({ name: stringValue, amount: 0, row: rowIndex + 1 });
+                // For other columns, just store the value
+                services.push({ name: String(cellValue).trim(), amount: 0, row: rowIndex + 1 });
               }
             }
           }
@@ -222,7 +217,7 @@ const ExcelImportSection = () => {
     setFileInfo(null);
   };
 
-  // Import sector data into service charges
+  // Import sector data into service charges - CORRECTED to match the expected format
   const importSectorData = async () => {
     if (!sectorData || Object.keys(sectorData).length === 0) {
       toast.error('No sector data available for import');
@@ -231,8 +226,9 @@ const ExcelImportSection = () => {
 
     try {
       let importedCount = 0;
+      const duplicateServices: string[] = [];
       
-      // Process each sector
+      // Process each sector - matching the correct format
       for (const [sectorName, rows] of Object.entries(sectorData)) {
         // Process each row in the sector
         for (const row of rows) {
@@ -251,21 +247,40 @@ const ExcelImportSection = () => {
                 const serviceCharge = {
                   name: serviceName,
                   amount: amount,
-                  sector: sectorName
+                  sector: sectorName // This ensures services are grouped by sector
                 };
                 
-                await addServiceCharge(serviceCharge);
-                importedCount++;
+                try {
+                  await addServiceCharge(serviceCharge);
+                  importedCount++;
+                } catch (error: any) {
+                  // Check if it's a duplicate error
+                  if (error.message && error.message.includes('duplicate')) {
+                    duplicateServices.push(`${sectorName} - ${serviceName}`);
+                  } else {
+                    throw error; // Re-throw if it's not a duplicate error
+                  }
+                }
               }
             }
           }
         }
       }
       
-      if (importedCount > 0) {
-        toast.success(`Successfully imported ${importedCount} service charges with sector information!`);
+      let message = `Successfully imported ${importedCount} service charges with sector information!`;
+      
+      if (duplicateServices.length > 0) {
+        message += ` Skipped ${duplicateServices.length} duplicate services.`;
+      }
+      
+      if (importedCount > 0 || duplicateServices.length > 0) {
+        toast.success(message);
+        
+        if (duplicateServices.length > 0) {
+          console.log('Duplicate services skipped:', duplicateServices);
+        }
       } else {
-        toast.info('No valid service charges found in the sector data. Please check that your Excel file has at least 3 columns: Sector, Service, Amount');
+        toast.info('No valid service charges found in the sector data. Please check that your Excel file has at least 3 columns: Sector Name, Service Name, Amount');
       }
     } catch (error) {
       console.error('Error importing sector data:', error);
@@ -277,7 +292,9 @@ const ExcelImportSection = () => {
     <Card>
       <CardHeader>
         <CardTitle>Excel Import Section</CardTitle>
-        <CardDescription>Import Excel data and use it for sector/service selection</CardDescription>
+        <CardDescription>
+          Import Excel data in the format: Sector Name, Service Name, Amount (one service per row)
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <div className="space-y-6">
@@ -320,7 +337,7 @@ const ExcelImportSection = () => {
                   variant="default"
                 >
                   <PlusCircle className="w-4 h-4 mr-2" />
-                  Import Sector Data
+                  Import All Services
                 </Button>
               )}
             </div>
@@ -336,6 +353,19 @@ const ExcelImportSection = () => {
               Supported formats: .xlsx, .xls (Max 10MB)
             </p>
             
+            {/* Format instructions */}
+            <div className="mt-3 p-3 bg-blue-50 rounded-md text-left">
+              <p className="text-sm font-medium text-blue-800">Expected Format:</p>
+              <p className="text-xs text-blue-700 mt-1">
+                Each row should contain exactly 3 columns:<br/>
+                <strong>Sector Name, Service Name, Amount</strong><br/><br/>
+                Example:<br/>
+                Tourism, Camping, 8000<br/>
+                Tourism, Photography, 3000<br/>
+                Tourism, Travel Insurance, 7000
+              </p>
+            </div>
+            
             {/* File info display */}
             {fileInfo && (
               <div className="mt-3 p-2 bg-green-50 rounded-md flex items-center justify-center">
@@ -347,7 +377,7 @@ const ExcelImportSection = () => {
             )}
           </div>
 
-          {/* File information and statistics */}
+          {/* File information and statistics - ENHANCED */}
           {excelData && (
             <div className="bg-blue-50 p-4 rounded-lg">
               <h3 className="font-medium text-blue-800 mb-2">File Statistics</h3>
@@ -365,14 +395,21 @@ const ExcelImportSection = () => {
                   <div className="text-muted-foreground">Sectors</div>
                 </div>
                 <div className="bg-white p-2 rounded text-center">
-                  <div className="font-bold text-lg">{Object.keys(serviceData).length}</div>
-                  <div className="text-muted-foreground">Services</div>
+                  <div className="font-bold text-lg">
+                    {Object.values(sectorData).reduce((total, sector) => total + sector.length, 0)}
+                  </div>
+                  <div className="text-muted-foreground">Total Services</div>
                 </div>
+              </div>
+              <div className="mt-3 p-3 bg-green-50 rounded-md">
+                <p className="text-sm text-green-800">
+                  <strong>Format Detected:</strong> Sector Name, Service Name, Amount
+                </p>
               </div>
             </div>
           )}
 
-          {/* Sector Selection */}
+          {/* Sector Selection - ENHANCED to show correct sector data */}
           {Object.keys(sectorData).length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -384,7 +421,7 @@ const ExcelImportSection = () => {
                   <SelectContent>
                     {Object.keys(sectorData).map(sector => (
                       <SelectItem key={sector} value={sector}>
-                        {sector} ({sectorData[sector].length} items)
+                        {sector} ({sectorData[sector].length} services)
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -392,19 +429,12 @@ const ExcelImportSection = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="header">Select Header</Label>
-                <Select value={selectedHeader} onValueChange={setSelectedHeader}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a header" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {excelData?.headers.map((header, index) => (
-                      <SelectItem key={index} value={header}>
-                        {header}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label htmlFor="header">Data Format</Label>
+                <div className="p-3 bg-blue-50 rounded-md">
+                  <p className="text-sm text-blue-800">
+                    Expected Format: <strong>Sector Name, Service Name, Amount</strong>
+                  </p>
+                </div>
               </div>
             </div>
           )}
@@ -469,6 +499,45 @@ const ExcelImportSection = () => {
             </div>
           )}
 
+          {/* Sector Data Preview - NEW FEATURE */}
+          {selectedSector && sectorData[selectedSector] && (
+            <div className="border rounded-lg overflow-hidden">
+              <div className="bg-muted p-2 font-medium flex justify-between items-center">
+                <span>Services in Sector: {selectedSector}</span>
+                <span className="text-sm font-normal">
+                  {sectorData[selectedSector].length} services
+                </span>
+              </div>
+              <div className="max-h-60 overflow-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-muted">
+                      <th className="p-2 text-left border-b">Service Name</th>
+                      <th className="p-2 text-left border-b">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sectorData[selectedSector].map((row: any, index) => (
+                      <tr key={index} className="border-b hover:bg-muted">
+                        <td className="p-2">
+                          {row[1] !== undefined && row[1] !== null && row[1] !== '' ? String(row[1]) : '-'}
+                        </td>
+                        <td className="p-2">
+                          {row[2] !== undefined && row[2] !== null && row[2] !== '' ? 
+                            new Intl.NumberFormat('en-IN', {
+                              style: 'currency',
+                              currency: 'INR',
+                            }).format(parseFloat(String(row[2])) || 0) : 
+                            '-'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
           {/* Dynamic Dropdown Based on Selection */}
           {selectedSector && selectedHeader && (
             <div className="space-y-4">
@@ -522,11 +591,11 @@ const ExcelImportSection = () => {
             </div>
           )}
 
-          {/* Preview of imported data */}
+          {/* Preview of imported data - ENHANCED to show the correct format */}
           {excelData && (
             <div className="border rounded-lg overflow-hidden">
               <div className="bg-muted p-2 font-medium flex justify-between items-center">
-                <span>Imported Data Preview</span>
+                <span>Imported Data Preview (Sector, Service, Amount)</span>
                 <span className="text-sm font-normal">
                   {excelData.rows.length} rows × {excelData.headers.length} columns
                 </span>
@@ -535,26 +604,33 @@ const ExcelImportSection = () => {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-muted">
-                      {excelData.headers.map((header, index) => (
-                        <th key={index} className="p-2 text-left border-b">
-                          {header}
-                        </th>
-                      ))}
+                      <th className="p-2 text-left border-b">Sector Name</th>
+                      <th className="p-2 text-left border-b">Service Name</th>
+                      <th className="p-2 text-left border-b">Amount</th>
                     </tr>
                   </thead>
                   <tbody>
                     {excelData.rows.slice(0, 15).map((row, rowIndex) => (
                       <tr key={rowIndex} className="border-b hover:bg-muted">
-                        {row.map((cell: any, cellIndex: number) => (
-                          <td key={cellIndex} className="p-2 border-r last:border-r-0 max-w-xs truncate">
-                            {cell !== undefined && cell !== null && cell !== '' ? String(cell) : '-'}
-                          </td>
-                        ))}
+                        <td className="p-2 border-r max-w-xs truncate">
+                          {row[0] !== undefined && row[0] !== null && row[0] !== '' ? String(row[0]) : '-'}
+                        </td>
+                        <td className="p-2 border-r max-w-xs truncate">
+                          {row[1] !== undefined && row[1] !== null && row[1] !== '' ? String(row[1]) : '-'}
+                        </td>
+                        <td className="p-2 border-r max-w-xs truncate">
+                          {row[2] !== undefined && row[2] !== null && row[2] !== '' ? 
+                            new Intl.NumberFormat('en-IN', {
+                              style: 'currency',
+                              currency: 'INR',
+                            }).format(parseFloat(String(row[2])) || 0) : 
+                            '-'}
+                        </td>
                       </tr>
                     ))}
                     {excelData.rows.length > 15 && (
                       <tr>
-                        <td colSpan={excelData.headers.length} className="p-2 text-center text-muted-foreground">
+                        <td colSpan={3} className="p-2 text-center text-muted-foreground">
                           ... and {excelData.rows.length - 15} more rows
                         </td>
                       </tr>

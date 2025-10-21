@@ -24,7 +24,9 @@ const AddExpenseForm = () => {
   const [date, setDate] = useState('');
   const [company, setCompany] = useState('');
   const [clientName, setClientName] = useState('');
+  const [candidateName, setCandidateName] = useState(''); // Add candidate name state
   const [sector, setSector] = useState('');
+  const [serviceName, setServiceName] = useState(''); // Add service name state
   const [file, setFile] = useState<File | null>(null);
   const [filePreview, setFilePreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -66,7 +68,7 @@ const AddExpenseForm = () => {
       return;
     }
     
-    if (!amount || !date || !company || !clientName || !sector || !description) {
+    if (!amount || !date || !company || !clientName || !candidateName || !sector || !description || !serviceName) { // Add candidateName to validation
       toast.error('Please fill in all required fields');
       return;
     }
@@ -93,7 +95,9 @@ const AddExpenseForm = () => {
         date,
         company,
         clientName,
+        candidateName, // Include candidate name in expense data
         sector,
+        serviceName, // Include service name in expense data
         file: fileBase64,
         fileName: file?.name || null,
       };
@@ -108,7 +112,9 @@ const AddExpenseForm = () => {
       setDate('');
       setCompany('');
       setClientName('');
+      setCandidateName(''); // Reset candidate name
       setSector('');
+      setServiceName(''); // Reset service name
       setFile(null);
       setFilePreview(null);
       
@@ -194,34 +200,62 @@ const AddExpenseForm = () => {
             </div>
           </div>
           
-          <div className="space-y-2">
-            <Label htmlFor="sector">Sector</Label>
-            <Input
-              id="sector"
-              type="text"
-              placeholder="Enter sector"
-              value={sector}
-              onChange={(e) => setSector(e.target.value)}
-              required
-              className="h-11"
-            />
+          <div className="grid gap-5 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="candidateName">Candidate Name</Label>
+              <Input
+                id="candidateName"
+                type="text"
+                placeholder="Enter candidate name"
+                value={candidateName}
+                onChange={(e) => setCandidateName(e.target.value)}
+                required
+                className="h-11"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="sector">Sector</Label>
+              <Input
+                id="sector"
+                type="text"
+                placeholder="Enter sector"
+                value={sector}
+                onChange={(e) => setSector(e.target.value)}
+                required
+                className="h-11"
+              />
+            </div>
           </div>
           
-          <div className="space-y-2">
-            <Label htmlFor="status">User Status</Label>
-            <Select value={currentUser?.status || 'employee'} disabled>
-              <SelectTrigger className="h-11">
-                <SelectValue placeholder="Select user status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="employee">Employee</SelectItem>
-                <SelectItem value="founder">Founder</SelectItem>
-                <SelectItem value="manager">Manager</SelectItem>
-                <SelectItem value="intern">Intern</SelectItem>
-                <SelectItem value="admin">Admin</SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-sm text-muted-foreground">Status is managed in your profile settings</p>
+          <div className="grid gap-5 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="serviceName">Service Name *</Label>
+              <Input
+                id="serviceName"
+                type="text"
+                placeholder="Enter service name"
+                value={serviceName}
+                onChange={(e) => setServiceName(e.target.value)}
+                required
+                className="h-11"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="status">User Status</Label>
+              <Select value={currentUser?.status || 'employee'} disabled>
+                <SelectTrigger className="h-11">
+                  <SelectValue placeholder="Select user status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="employee">Employee</SelectItem>
+                  <SelectItem value="founder">Founder</SelectItem>
+                  <SelectItem value="manager">Manager</SelectItem>
+                  <SelectItem value="intern">Intern</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-sm text-muted-foreground">Status is managed in your profile settings</p>
+            </div>
           </div>
           
           <div className="space-y-2">

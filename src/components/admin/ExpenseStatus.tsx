@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useData } from '@/contexts/DataContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -12,6 +12,7 @@ const ExpenseStatus = () => {
   const { expenses, employees, updateExpense } = useData();
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [expandedClients, setExpandedClients] = useState<Record<string, boolean>>({});
+  const [allExpanded, setAllExpanded] = useState<boolean>(false);
 
   const getFileIcon = (fileName: string | null) => {
     if (!fileName) return <FileText className="w-4 h-4" />;
@@ -62,12 +63,19 @@ const ExpenseStatus = () => {
     const groups: Record<string, any[]> = {};
     
     filteredExpenses.forEach(expense => {
-      const clientName = expense.clientName || 'Unknown Client';
+      // Normalize client name to handle case and whitespace differences
+      const clientName = expense.clientName 
+        ? expense.clientName.trim() 
+        : 'Unknown Client';
+      
       if (!groups[clientName]) {
         groups[clientName] = [];
       }
       groups[clientName].push(expense);
     });
+    
+    // Debug logging to see grouping
+    console.log('ExpenseStatus grouped expenses by client:', groups);
     
     return groups;
   }, [filteredExpenses]);
@@ -77,6 +85,15 @@ const ExpenseStatus = () => {
       ...prev,
       [clientName]: !prev[clientName]
     }));
+  };
+
+  const toggleAllExpansion = () => {
+    const newExpandedState: Record<string, boolean> = {};
+    Object.keys(groupedExpenses).forEach(clientName => {
+      newExpandedState[clientName] = !allExpanded;
+    });
+    setExpandedClients(newExpandedState);
+    setAllExpanded(!allExpanded);
   };
 
   const pendingCount = expenses.filter(expense => (expense.status || 'pending') === 'pending').length;
@@ -111,7 +128,7 @@ const ExpenseStatus = () => {
           </div>
           
           {/* Status Filter */}
-          <div className="flex gap-4">
+          <div className="flex gap-4 items-center">
             <div className="w-40">
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger>
@@ -124,6 +141,9 @@ const ExpenseStatus = () => {
                 </SelectContent>
               </Select>
             </div>
+            <Button variant="outline" onClick={toggleAllExpansion}>
+              {allExpanded ? 'Collapse All' : 'Expand All'}
+            </Button>
           </div>
         </div>
       </CardHeader>
@@ -135,6 +155,7 @@ const ExpenseStatus = () => {
                 <TableHead>Employee</TableHead>
                 <TableHead>Amount</TableHead>
                 <TableHead>Description</TableHead>
+                <TableHead>Client Name</TableHead>
                 <TableHead>Company</TableHead>
                 <TableHead>Sector</TableHead>
                 <TableHead>File</TableHead>
@@ -146,16 +167,16 @@ const ExpenseStatus = () => {
             <TableBody>
               {Object.keys(groupedExpenses).length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
                     No expenses found
                   </TableCell>
                 </TableRow>
               ) : (
                 Object.entries(groupedExpenses).map(([clientName, clientExpenses]) => (
-                  <>
+                  <React.Fragment key={clientName}>
                     {/* Client Group Header */}
-                    <TableRow key={clientName} className="bg-muted/50">
-                      <TableCell colSpan={9} className="font-bold py-3">
+                    <TableRow className="bg-muted/50">
+                      <TableCell colSpan={10} className="font-bold py-3">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <Button
@@ -198,6 +219,7 @@ const ExpenseStatus = () => {
                             </Badge>
                           </TableCell>
                           <TableCell>{expense.description}</TableCell>
+                          <TableCell>{expense.clientName || 'N/A'}</TableCell>
                           <TableCell>{expense.company || 'N/A'}</TableCell>
                           <TableCell>{expense.sector || 'N/A'}</TableCell>
                           <TableCell>
@@ -231,7 +253,7 @@ const ExpenseStatus = () => {
                         </TableRow>
                       );
                     })}
-                  </>
+                  </React.Fragment>
                 ))
               )}
             </TableBody>

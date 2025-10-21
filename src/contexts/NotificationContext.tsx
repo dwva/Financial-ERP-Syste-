@@ -7,9 +7,10 @@ export interface Notification {
   message: string;
   timestamp: Date;
   read: boolean;
-  type: 'expense_added' | 'expense_updated';
+  type: 'expense_added' | 'expense_updated' | 'new_message';
   expenseId?: string;
   userId?: string;
+  messageId?: string;
 }
 
 interface NotificationContextType {
@@ -28,7 +29,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     const saved = localStorage.getItem('admin_notifications');
     return saved ? JSON.parse(saved) : [];
   });
-  const [previousExpenses, setPreviousExpenses] = useState<any[]>(expenses);
+  const [previousExpenses, setPreviousExpenses] = useState<any[]>([]);
 
   // Calculate unread count
   const unreadCount = notifications.filter(notification => !notification.read).length;
@@ -40,6 +41,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   // Detect expense changes and create notifications
   useEffect(() => {
+    // Initialize previousExpenses on first render
     if (previousExpenses.length === 0 && expenses.length > 0) {
       setPreviousExpenses(expenses);
       return;

@@ -32,8 +32,8 @@ const App = () => (
         theme="light"
       />
       <BrowserRouter>
-        <DataProvider>
-          <AuthProvider>
+        <AuthProvider>
+          <DataProvider>
             <NotificationProvider>
               <Routes>
                 <Route path="/login" element={<Login />} />
@@ -57,8 +57,8 @@ const App = () => (
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </NotificationProvider>
-          </AuthProvider>
-        </DataProvider>
+          </DataProvider>
+        </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

@@ -27,15 +27,14 @@ const EditExpenseForm = ({ expense, onCancel, onSave }: EditExpenseFormProps) =>
   const [description, setDescription] = useState(expense.description);
   const [date, setDate] = useState(expense.date);
   const [company, setCompany] = useState(expense.company);
+  const [clientName, setClientName] = useState(expense.clientName || ''); // Add clientName state
+  const [candidateName, setCandidateName] = useState(expense.candidateName || ''); // Add candidateName state
   const [sector, setSector] = useState(expense.sector);
+  const [serviceName, setServiceName] = useState(expense.serviceName || ''); // Add serviceName state
   const [file, setFile] = useState<File | null>(null);
   const [filePreview, setFilePreview] = useState<string | null>(expense.file);
   const [fileName, setFileName] = useState<string | null>(expense.fileName);
   const [loading, setLoading] = useState(false);
-
-  // Removed additional fields functionality
-
-  // Removed additional fields useEffect
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -62,10 +61,14 @@ const EditExpenseForm = ({ expense, onCancel, onSave }: EditExpenseFormProps) =>
     setFileName(null);
   };
 
-  // Removed additional fields handlers
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Add service name validation
+    if (!serviceName) {
+      toast.error('Please enter service name');
+      return;
+    }
     
     setLoading(true);
     
@@ -87,7 +90,10 @@ const EditExpenseForm = ({ expense, onCancel, onSave }: EditExpenseFormProps) =>
         description,
         date,
         company,
+        clientName, // Include clientName in the data
+        candidateName, // Include candidateName in the data
         sector,
+        serviceName, // Include serviceName in the data
         file: fileBase64,
         fileName: fileName
       };
@@ -170,6 +176,32 @@ const EditExpenseForm = ({ expense, onCancel, onSave }: EditExpenseFormProps) =>
               />
             </div>
             <div className="space-y-2">
+              <Label htmlFor="clientName">Client Name *</Label>
+              <Input
+                id="clientName"
+                type="text"
+                placeholder="Enter client name"
+                value={clientName}
+                onChange={(e) => setClientName(e.target.value)}
+                required
+                className="h-11"
+              />
+            </div>
+          </div>
+          
+          <div className="grid gap-5 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="candidateName">Candidate Name</Label>
+              <Input
+                id="candidateName"
+                type="text"
+                placeholder="Enter candidate name"
+                value={candidateName}
+                onChange={(e) => setCandidateName(e.target.value)}
+                className="h-11"
+              />
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="sector">Sector</Label>
               <Input
                 id="sector"
@@ -183,16 +215,30 @@ const EditExpenseForm = ({ expense, onCancel, onSave }: EditExpenseFormProps) =>
             </div>
           </div>
           
-          <div className="space-y-2">
-            <Label htmlFor="description">Description</Label>
-            <Textarea
-              id="description"
-              placeholder="Enter expense details..."
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              required
-              rows={3}
-            />
+          <div className="grid gap-5 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="serviceName">Service Name *</Label>
+              <Input
+                id="serviceName"
+                type="text"
+                placeholder="Enter service name"
+                value={serviceName}
+                onChange={(e) => setServiceName(e.target.value)}
+                required
+                className="h-11"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                placeholder="Enter expense details..."
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                required
+                rows={3}
+              />
+            </div>
           </div>
 
           <div className="space-y-2">
@@ -241,8 +287,6 @@ const EditExpenseForm = ({ expense, onCancel, onSave }: EditExpenseFormProps) =>
               </div>
             </div>
           )}
-
-          {/* Additional Fields Section Removed */}
 
           <div className="flex gap-3">
             <Button type="button" variant="outline" onClick={onCancel} disabled={loading} className="flex-1 h-11">
