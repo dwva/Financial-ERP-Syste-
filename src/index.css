@@ -2,23 +2,26 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Import Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@300;400;500;600;700&family=Roboto:wght@300;400;500;700&family=Open+Sans:wght@300;400;500;600;700&display=swap');
+
 /* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
 All colors MUST be HSL.
 */
 
 @layer base {
   :root {
-    --background: 220 40% 98%;
-    --foreground: 222 47% 11%;
-
+    --background: 0 0% 100%;
+    --foreground: 0 0% 0%;
+    
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+    --card-foreground: 0 0% 0%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
+    --popover-foreground: 0 0% 0%;
 
-    --primary: 214 92% 56%;
-    --primary-foreground: 0 0% 100%;
+    --primary: 0 0% 100%;
+    --primary-foreground: 0 0% 0%;
 
     --secondary: 220 40% 95%;
     --secondary-foreground: 222 47% 11%;
@@ -26,7 +29,7 @@ All colors MUST be HSL.
     --muted: 220 40% 95%;
     --muted-foreground: 215 18% 50%;
 
-    --accent: 159 76% 40%;
+    --accent: 255 75% 60%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84% 60%;
@@ -34,7 +37,7 @@ All colors MUST be HSL.
 
     --border: 220 32% 90%;
     --input: 220 32% 90%;
-    --ring: 214 92% 56%;
+    --ring: 255 75% 60%;
 
     --success: 142 76% 36%;
     --success-foreground: 0 0% 100%;
@@ -42,22 +45,15 @@ All colors MUST be HSL.
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 100%;
 
-    --radius: 0.75rem;
+    --radius: 1rem;
 
     --sidebar-background: 0 0% 98%;
-
     --sidebar-foreground: 240 5.3% 26.1%;
-
     --sidebar-primary: 240 5.9% 10%;
-
     --sidebar-primary-foreground: 0 0% 98%;
-
     --sidebar-accent: 240 4.8% 95.9%;
-
     --sidebar-accent-foreground: 240 5.9% 10%;
-
     --sidebar-border: 220 13% 91%;
-
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
 
@@ -71,8 +67,8 @@ All colors MUST be HSL.
     --popover: 222 47% 13%;
     --popover-foreground: 210 40% 98%;
 
-    --primary: 214 84% 56%;
-    --primary-foreground: 0 0% 100%;
+    --primary: 0 0% 100%;
+    --primary-foreground: 0 0% 0%;
 
     --secondary: 217 33% 18%;
     --secondary-foreground: 210 40% 98%;
@@ -80,7 +76,7 @@ All colors MUST be HSL.
     --muted: 217 33% 18%;
     --muted-foreground: 215 20% 65%;
 
-    --accent: 152 69% 31%;
+    --accent: 255 75% 60%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 63% 31%;
@@ -88,7 +84,7 @@ All colors MUST be HSL.
 
     --border: 217 33% 18%;
     --input: 217 33% 18%;
-    --ring: 214 84% 56%;
+    --ring: 255 75% 60%;
 
     --success: 142 76% 36%;
     --success-foreground: 0 0% 100%;
@@ -113,6 +109,36 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-body;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-heading;
+  }
+}
+
+@layer components {
+  .btn-rounded {
+    @apply rounded-2xl px-6 py-3 font-medium transition-all duration-300;
+  }
+  
+  .card-rounded {
+    @apply rounded-3xl overflow-hidden;
+  }
+  
+  .input-rounded {
+    @apply rounded-xl border-2 focus:ring-2 focus:ring-violet-500;
+  }
+  
+  .select-rounded {
+    @apply rounded-xl border-2 focus:ring-2 focus:ring-violet-500;
+  }
+  
+  .chart-violet {
+    @apply text-violet-500 fill-violet-500;
+  }
+  
+  .chart-grey {
+    @apply text-grey-400 fill-grey-400;
   }
 }

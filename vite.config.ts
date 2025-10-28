@@ -6,8 +6,22 @@ import { componentTagger } from "lovable-tagger";
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   server: {
-    host: "::",
+    host: "0.0.0.0",
     port: 8087,
+    proxy: {
+      '/upload': {
+        target: 'http://0.0.0.0:3002',
+        changeOrigin: true,
+      },
+      '/file': {
+        target: 'http://0.0.0.0:3002',
+        changeOrigin: true,
+      },
+      '/message-attachments': {
+        target: 'http://0.0.0.0:3002',
+        changeOrigin: true,
+      }
+    }
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {

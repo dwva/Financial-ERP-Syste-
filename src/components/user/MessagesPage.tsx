@@ -4,70 +4,61 @@ import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useData } from '@/contexts/DataContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useNotification } from '@/contexts/NotificationContext';
 import { Message } from '@/services/messageService';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Download, FileText, Mail, MailOpen, Clock, RefreshCw, Trash2 } from 'lucide-react';
 import { toast } from 'react-toastify';
+import { downloadLocalFile } from '@/services/messageFileService';
 
 const MessagesPage = () => {
-  const { getUserMessages, markMessageAsRead, getAllMessages, deleteMessage } = useData();
+  const { messages, markMessageAsRead, deleteMessage, loading: dataLoading } = useData();
   const { user } = useAuth();
-  const [messages, setMessages] = useState<Message[]>([]);
+  const { markAsRead } = useNotification();
   const [loading, setLoading] = useState<boolean>(true);
-  const [indexError, setIndexError] = useState<boolean>(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState<boolean>(false);
   const [messageToDelete, setMessageToDelete] = useState<{ id: string; subject: string } | null>(null);
+  const [userMessages, setUserMessages] = useState<Message[]>([]);
 
-  // Get user's messages
-  const fetchMessages = async () => {
-    if (user?.email) {
-      try {
-        setLoading(true);
-        setIndexError(false);
-        console.log('Fetching messages for user with email:', user.email);
-        
-        // First try the Firebase query
-        let userMessages = [];
+  // Filter messages for the current user
+  useEffect(() => {
+    if (messages.length > 0 && user?.email) {
+      const filteredMessages = messages.filter(msg => msg.receiverId === user.email);
+      setUserMessages(filteredMessages);
+      setLoading(false);
+    } else if (messages.length === 0) {
+      setLoading(false);
+    }
+  }, [messages, user]);
+
+  // Mark all messages as read when the user views the messages page
+  useEffect(() => {
+    if (userMessages.length > 0 && user?.email) {
+      // Find unread messages for this user
+      const unreadMessages = userMessages.filter(msg => !msg.read);
+      
+      // Mark each unread message as read
+      unreadMessages.forEach(async (message) => {
         try {
-          userMessages = await getUserMessages(user.email);
-          console.log('Fetched messages using Firebase query:', userMessages);
-        } catch (queryError: any) {
-          console.log('Firebase query failed, falling back to client-side filtering');
-          console.log('Error details:', queryError);
-          // If Firebase query fails due to index requirements, inform the user
-          if (queryError.message && queryError.message.includes('query requires an index')) {
-            setIndexError(true);
-            toast.info('Setting up message system. This may take a moment. Please try again in a few seconds.');
-            return;
-          }
-          // Fall back to client-side filtering
-          const allMessages = await getAllMessages();
-          userMessages = allMessages.filter((msg: any) => msg.receiverId === user.email);
-          console.log('Fetched messages using client-side filtering:', userMessages);
+          await markMessageAsRead(message.id!);
+          
+          // Also mark any related notifications as read
+          // In a real implementation, you might want to find notifications by messageId
+        } catch (error) {
+          console.error('Error marking message as read:', error);
         }
-        
-        setMessages(userMessages);
-      } catch (error) {
-        console.error('Error fetching messages:', error);
-        toast.error('Failed to load messages');
-      } finally {
-        setLoading(false);
+      });
+      
+      // Show a toast notification if there were new messages
+      if (unreadMessages.length > 0) {
+        toast.success(`Marked ${unreadMessages.length} message(s) as read`);
       }
     }
-  };
-
-  useEffect(() => {
-    fetchMessages();
-  }, [user, getUserMessages]);
+  }, [userMessages, user?.email]);
 
   const handleMarkAsRead = async (messageId: string) => {
     try {
       await markMessageAsRead(messageId);
-      setMessages(prev => 
-        prev.map(msg => 
-          msg.id === messageId ? { ...msg, read: true } : msg
-        )
-      );
       toast.success('Message marked as read');
     } catch (error) {
       console.error('Error marking message as read:', error);
@@ -85,7 +76,37 @@ const MessagesPage = () => {
     }
   };
 
-  const unreadCount = messages.filter(msg => !msg.read).length;
+  const unreadCount = userMessages.filter(msg => !msg.read).length;
+
+  // Function to download a file
+  const handleDownloadFile = (fileUrl: string, fileName: string) => {
+    try {
+      // Check if this is a local file URL
+      if (fileUrl.startsWith('/message-attachments/')) {
+        // For local files, create the full URL with hostname
+        const fullUrl = `${window.location.protocol}//${window.location.hostname}:3002${fileUrl}`;
+        const a = document.createElement('a');
+        a.href = fullUrl;
+        a.download = fileName;
+        a.target = '_blank';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      } else {
+        // For other URLs, create a temporary link
+        const a = document.createElement('a');
+        a.href = fileUrl;
+        a.download = fileName;
+        a.target = '_blank';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }
+    } catch (error) {
+      console.error('Error downloading file:', error);
+      toast.error('Failed to download file. Please try again.');
+    }
+  };
 
   // Function to delete a message
   const handleDeleteMessage = async (messageId: string, messageSubject: string) => {
@@ -112,9 +133,6 @@ const MessagesPage = () => {
       console.log('Deleting message with ID:', messageToDelete.id);
       await deleteMessage(messageToDelete.id);
       console.log('Message deleted successfully');
-      
-      // Remove the message from the local state
-      setMessages(prevMessages => prevMessages.filter(msg => msg.id !== messageToDelete.id));
       
       toast.success('Message deleted successfully');
     } catch (error: any) {
@@ -149,47 +167,23 @@ const MessagesPage = () => {
             <Button 
               variant="outline" 
               size="sm" 
-              onClick={fetchMessages}
+              onClick={() => setLoading(!loading)} // Simple refresh toggle
+              disabled={dataLoading}
             >
-              <RefreshCw className="w-4 h-4" />
+              <RefreshCw className={`w-4 h-4 ${dataLoading ? 'animate-spin' : ''}`} />
             </Button>
           </div>
         </div>
       </CardHeader>
       <CardContent>
-        {loading ? (
+        {loading || dataLoading ? (
           <div className="flex justify-center items-center h-64">
             <div className="text-center">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-2"></div>
               <p>Loading messages...</p>
             </div>
           </div>
-        ) : indexError ? (
-          <div className="text-center py-8">
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 max-w-2xl mx-auto">
-              <div className="flex justify-center mb-4">
-                <div className="bg-blue-100 p-3 rounded-full">
-                  <RefreshCw className="w-6 h-6 text-blue-600 animate-spin" />
-                </div>
-              </div>
-              <h3 className="text-lg font-medium text-blue-800 mb-2">Setting up message system</h3>
-              <p className="text-blue-700 mb-4">
-                We're creating an index to optimize your message performance. This is a one-time setup that may take a few moments.
-              </p>
-              <p className="text-blue-600 text-sm mb-4">
-                Please wait or try refreshing the page in a minute.
-              </p>
-              <Button 
-                variant="outline" 
-                onClick={fetchMessages}
-                className="border-blue-300 text-blue-700 hover:bg-blue-50"
-              >
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Refresh
-              </Button>
-            </div>
-          </div>
-        ) : messages.length === 0 ? (
+        ) : userMessages.length === 0 ? (
           <div className="text-center py-12">
             <Mail className="w-12 h-12 mx-auto text-gray-400 mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-1">No messages yet</h3>
@@ -209,7 +203,7 @@ const MessagesPage = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {messages.map((message) => (
+                {userMessages.map((message) => (
                   <TableRow 
                     key={message.id} 
                     className={!message.read ? 'bg-blue-50' : ''}
@@ -236,6 +230,17 @@ const MessagesPage = () => {
                         <div className="flex items-center gap-2">
                           <FileText className="w-4 h-4" />
                           <span className="text-sm">{message.fileName}</span>
+                          {message.fileUrl && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDownloadFile(message.fileUrl!, message.fileName!)}
+                              className="ml-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50"
+                              title="Download file"
+                            >
+                              <Download className="w-4 h-4" />
+                            </Button>
+                          )}
                         </div>
                       ) : (
                         'No file attached'
@@ -253,14 +258,14 @@ const MessagesPage = () => {
                           </Button>
                         )}
                         {message.fileUrl && message.fileName && (
-                          <a 
-                            href={message.fileUrl} 
-                            download={message.fileName}
-                            className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3"
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDownloadFile(message.fileUrl!, message.fileName!)}
                           >
                             <Download className="w-4 h-4 mr-1" />
                             Download
-                          </a>
+                          </Button>
                         )}
                         <Button
                           variant="ghost"

@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Financial ERP System - Access Instructions</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+        }
+        .access-links {
+            background-color: #e8f4fd;
+            padding: 20px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .link {
+            display: block;
+            margin: 10px 0;
+            padding: 15px;
+            background-color: #3498db;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            text-align: center;
+            font-weight: bold;
+        }
+        .link:hover {
+            background-color: #2980b9;
+        }
+        .warning {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        code {
+            background-color: #f8f9fa;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Financial ERP System Access</h1>
+        
+        <div class="access-links">
+            <h2>Local Network Access</h2>
+            <p>Access the application from any device on the same network using these links:</p>
+            
+            <a href="http://10.143.139.79:8090" class="link" target="_blank">
+                Main Application: http://10.143.139.79:8090
+            </a>
+            
+            <a href="http://10.143.139.79:3002" class="link" target="_blank">
+                File Upload Server: http://10.143.139.79:3002
+            </a>
+        </div>
+        
+        <h2>Access Instructions</h2>
+        <ol>
+            <li><strong>Ensure both servers are running:</strong>
+                <ul>
+                    <li>Main application server (port 8090)</li>
+                    <li>File upload server (port 3002)</li>
+                </ul>
+            </li>
+            <li><strong>Connect from another device:</strong>
+                <ul>
+                    <li>Make sure the other device is on the same WiFi/network</li>
+                    <li>Open a web browser on that device</li>
+                    <li>Navigate to <code>http://10.143.139.79:8090</code></li>
+                </ul>
+            </li>
+        </ol>
+        
+        <div class="warning">
+            <h3>⚠️ Security Warning</h3>
+            <p>These servers are accessible to anyone on your local network. For security:</p>
+            <ul>
+                <li>Don't share your network password with untrusted users</li>
+                <li>Stop the servers when not in use</li>
+                <li>Consider using strong passwords for admin accounts</li>
+            </ul>
+        </div>
+        
+        <h2>Troubleshooting</h2>
+        <p>If you can't access the application from another device:</p>
+        <ul>
+            <li>Check that both servers are still running</li>
+            <li>Verify the IP address with <code>ipconfig</code> (Windows) or <code>ifconfig</code> (Mac/Linux)</li>
+            <li>Check Windows Firewall settings to ensure ports 8090 and 3002 are allowed</li>
+            <li>Try temporarily disabling antivirus software that might block the connection</li>
+        </ul>
+    </div>
+</body>
+</html>

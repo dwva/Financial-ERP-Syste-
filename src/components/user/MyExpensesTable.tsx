@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { 
   AlertDialog, 
   AlertDialogAction, 
@@ -16,7 +17,7 @@ import {
   AlertDialogHeader, 
   AlertDialogTitle 
 } from '@/components/ui/alert-dialog';
-import { Receipt, FileText, Image as ImageIcon, Trash2, Edit, Eye, ArrowUpDown } from 'lucide-react';
+import { Receipt, FileText, Image as ImageIcon, Trash2, Edit, Eye, ArrowUpDown, AlertTriangle, Download } from 'lucide-react';
 import { toast } from 'react-toastify';
 import EditExpenseForm from '@/components/user/EditExpenseForm';
 
@@ -104,13 +105,14 @@ const MyExpensesTable = () => {
                 <TableHead>Sector</TableHead>
                 <TableHead>File</TableHead>
                 <TableHead>Date</TableHead>
+                <TableHead>Status</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {userExpenses.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
                     No expenses recorded yet. Add your first expense above!
                   </TableCell>
                 </TableRow>
@@ -129,15 +131,61 @@ const MyExpensesTable = () => {
                     <TableCell>{expense.company}</TableCell>
                     <TableCell>{expense.sector}</TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-2">
-                        {getFileIcon(expense.fileName)}
-                        <span className="text-sm text-muted-foreground">
-                          {expense.fileName || 'No file'}
-                        </span>
-                      </div>
+                      {expense.fileName ? (
+                        <div className="flex items-center gap-2">
+                          {getFileIcon(expense.fileName)}
+                          <span className="text-sm text-muted-foreground truncate max-w-[120px]">
+                            {expense.fileName}
+                          </span>
+                          <div className="flex gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                if (expense.file) {
+                                  setSelectedExpense(expense);
+                                  setViewExpenseDialogOpen(true);
+                                }
+                              }}
+                              className="h-6 w-6 p-0"
+                            >
+                              <Eye className="w-3 h-3" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                if (expense.file) {
+                                  const link = document.createElement('a');
+                                  link.href = expense.file;
+                                  link.download = expense.fileName || 'file';
+                                  document.body.appendChild(link);
+                                  link.click();
+                                  document.body.removeChild(link);
+                                }
+                              }}
+                              className="h-6 w-6 p-0"
+                            >
+                              <Download className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">No file</span>
+                      )}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {new Date(expense.date).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell>
+                      {expense.overdue ? (
+                        <Badge variant="destructive" className="flex items-center gap-1">
+                          <AlertTriangle className="w-3 h-3" />
+                          Overdue
+                        </Badge>
+                      ) : (
+                        <Badge variant="default">Normal</Badge>
+                      )}
                     </TableCell>
                     <TableCell className="flex gap-2">
                       <Button
@@ -225,7 +273,16 @@ const MyExpensesTable = () => {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Status</p>
-                  <p className="font-medium">{selectedExpense.status || 'Pending'}</p>
+                  <p className="font-medium">
+                    {selectedExpense.overdue ? (
+                      <Badge variant="destructive" className="flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3" />
+                        Overdue
+                      </Badge>
+                    ) : (
+                      <Badge variant="default">Normal</Badge>
+                    )}
+                  </p>
                 </div>
               </div>
               
@@ -244,9 +301,23 @@ const MyExpensesTable = () => {
                       className="max-w-full h-auto rounded-lg border"
                     />
                   ) : (
-                    <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
-                      <FileText className="w-5 h-5" />
-                      <span>{selectedExpense.fileName}</span>
+                    <div className="flex flex-col items-center gap-2 p-4 bg-muted rounded-lg">
+                      <FileText className="w-8 h-8 text-muted-foreground" />
+                      <span className="text-sm">{selectedExpense.fileName}</span>
+                      <Button 
+                        size="sm"
+                        onClick={() => {
+                          const link = document.createElement('a');
+                          link.href = selectedExpense.file;
+                          link.download = selectedExpense.fileName || 'file';
+                          document.body.appendChild(link);
+                          link.click();
+                          document.body.removeChild(link);
+                        }}
+                      >
+                        <Download className="w-4 h-4 mr-2" />
+                        Download File
+                      </Button>
                     </div>
                   )}
                 </div>

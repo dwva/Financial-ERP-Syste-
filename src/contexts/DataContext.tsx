@@ -21,19 +21,27 @@ import {
   createProfitLossReport as createProfitLossReportService,
   updateProfitLossReport as updateProfitLossReportService,
   deleteProfitLossReport as deleteProfitLossReportService,
-  onExpensesChange // Add this import
+  onExpensesChange,
+  onMessagesChange,
+  // Add dropdown data imports
+  getDropdownData,
+  createDropdownData,
+  updateDropdownData as updateDropdownDataService,
+  deleteDropdownData as deleteDropdownDataService,
+  onDropdownDataChange
 } from '@/services/firebaseService';
+import { Timestamp } from 'firebase/firestore';
 import { 
-  sendMessage as sendMsg,
-  getUserMessages as getUserMsgs,
+  sendMessage as sendMsg, 
+  getUserMessages as getUserMsgs, 
   getAdminMessages as getAdminMsgs,
-  markMessageAsRead as markMsgRead,
-  uploadFile as uploadMsgFile,
-  getAllMessages as getAllMessagesService,
   getMessageById as getMessageByIdService,
-  deleteMessage as deleteMessageService
+  markMessageAsRead as markMsgRead,
+  deleteMessage as deleteMessageService,
+  getAllMessages as getAllMessagesService,
+  uploadFile,
+  Message
 } from '@/services/messageService';
-import { Message } from '@/services/messageService';
 
 export interface Employee {
   id: string;
@@ -63,6 +71,7 @@ export interface Expense {
   clientName?: string; // Make clientName optional for backward compatibility
   candidateName?: string; // Add candidateName field
   serviceName?: string; // Add serviceName field
+  overdue?: boolean; // Add overdue field
   created_at?: string;
   // Additional fields that can be added later
   [key: string]: any;
@@ -117,6 +126,14 @@ export interface ServiceCharge {
   sector?: string; // Add optional sector field
 }
 
+// Add this interface for dropdown data
+export interface DropdownData {
+  id: string;
+  type: 'company' | 'client' | 'candidate' | 'sector';
+  value: string;
+  createdAt: string;
+}
+
 interface DataContextType {
   employees: Employee[];
   expenses: Expense[];
@@ -124,6 +141,8 @@ interface DataContextType {
   serviceCharges: ServiceCharge[];
   invoiceHistory: Invoice[];
   profitLossReports: ProfitLossReport[];
+  messages: Message[];
+  dropdownData: DropdownData[]; // Add this line
   loading: boolean;
   error: string | null;
   addEmployee: (email: string, password: string, username?: string, mobile?: string) => Promise<void>;
@@ -140,6 +159,10 @@ interface DataContextType {
   deleteServiceCharge: (id: string) => Promise<void>;
   addInvoiceHistory: (invoice: Omit<Invoice, 'id' | 'createdAt'>) => Promise<void>;
   deleteInvoiceHistory: (id: string) => Promise<void>; // Add deleteInvoiceHistory function
+  // Add dropdown data functions
+  addDropdownData: (data: Omit<DropdownData, 'id' | 'createdAt'>) => Promise<void>;
+  updateDropdownData: (id: string, data: Partial<DropdownData>) => Promise<void>;
+  deleteDropdownData: (id: string) => Promise<void>;
   // Message functions
   sendMessage: (message: Omit<Message, 'id' | 'timestamp'>, file?: File) => Promise<Message>;
   getUserMessages: (userId: string) => Promise<Message[]>;
@@ -163,25 +186,45 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [serviceCharges, setServiceCharges] = useState<ServiceCharge[]>([]);
   const [invoiceHistory, setInvoiceHistory] = useState<Invoice[]>([]);
   const [profitLossReports, setProfitLossReports] = useState<ProfitLossReport[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [dropdownData, setDropdownData] = useState<DropdownData[]>([]); // Add this line
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [unsubscribeExpenses, setUnsubscribeExpenses] = useState<(() => void) | null>(null); // Add this state
+  const [unsubscribeExpenses, setUnsubscribeExpenses] = useState<(() => void) | null>(null);
+  const [unsubscribeMessages, setUnsubscribeMessages] = useState<(() => void) | null>(null);
 
   // Fetch initial data and set up real-time listeners
   useEffect(() => {
     refreshData();
     
     // Set up real-time listener for expenses
-    const unsubscribe = onExpensesChange((newExpenses) => {
+    const unsubscribeExpenses = onExpensesChange((newExpenses) => {
       setExpenses(newExpenses);
     });
     
-    setUnsubscribeExpenses(() => unsubscribe);
+    // Set up real-time listener for messages
+    const unsubscribeMessages = onMessagesChange((newMessages) => {
+      setMessages(newMessages);
+    });
     
-    // Clean up listener on unmount
+    // Set up real-time listener for dropdown data
+    const unsubscribeDropdownData = onDropdownDataChange((newData) => {
+      setDropdownData(newData);
+    });
+    
+    setUnsubscribeExpenses(() => unsubscribeExpenses);
+    setUnsubscribeMessages(() => unsubscribeMessages);
+    
+    // Clean up listeners on unmount
     return () => {
-      if (unsubscribe) {
-        unsubscribe();
+      if (unsubscribeExpenses) {
+        unsubscribeExpenses();
+      }
+      if (unsubscribeMessages) {
+        unsubscribeMessages();
+      }
+      if (unsubscribeDropdownData) {
+        unsubscribeDropdownData();
       }
     };
   }, []);
@@ -189,13 +232,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const refreshData = async () => {
     try {
       setLoading(true);
-      const [employeesData, expensesData, invoicesData, serviceChargesData, invoiceHistoryData, profitLossReportsData] = await Promise.all([
+      const [employeesData, expensesData, invoicesData, serviceChargesData, invoiceHistoryData, profitLossReportsData, dropdownData] = await Promise.all([
         getEmployees(),
         getExpenses(), // This will be replaced by real-time listener but keep for initial load
         getInvoices(),
         getServiceCharges(),
         getInvoiceHistory(),
-        getProfitLossReports()
+        getProfitLossReports(),
+        getDropdownData() // Add this line
       ]);
       setEmployees(employeesData);
       setExpenses(expensesData);
@@ -203,6 +247,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setServiceCharges(serviceChargesData);
       setInvoiceHistory(invoiceHistoryData);
       setProfitLossReports(profitLossReportsData);
+      setDropdownData(dropdownData); // Add this line
       setError(null);
     } catch (err) {
       console.error('Error fetching data:', err);
@@ -276,7 +321,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         timestamp: new Date().toISOString(), // Use full ISO string instead of just date part
       };
       const createdExpense = await createExpense(newExpense);
-      setExpenses(prev => [...prev, createdExpense as Expense]);
+      // Don't add to local state immediately since the real-time listener will update it
+      return createdExpense;
     } catch (err) {
       console.error('Error adding expense:', err);
       setError('Failed to add expense');
@@ -315,7 +361,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         createdAt: new Date().toISOString(),
       };
       const createdInvoice = await createInvoiceService(newInvoice);
-      setInvoices(prev => [...prev, createdInvoice as Invoice]);
+      // Don't add to local state immediately since the real-time listener will update it
+      return createdInvoice;
     } catch (err) {
       console.error('Error adding invoice:', err);
       setError('Failed to add invoice');
@@ -330,7 +377,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         createdAt: new Date().toISOString(),
       };
       const createdInvoice = await createInvoiceHistoryService(newInvoice);
-      setInvoiceHistory(prev => [...prev, createdInvoice as Invoice]);
+      // Don't add to local state immediately since the real-time listener will update it
+      return createdInvoice;
     } catch (err) {
       console.error('Error adding invoice history:', err);
       setError('Failed to add invoice history');
@@ -430,32 +478,34 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Message functions
   const sendMessage = async (message: Omit<Message, 'id' | 'timestamp'>, file?: File) => {
     try {
-      let fileUrl = '';
-      let fileName = '';
-      
-      if (file) {
-        fileUrl = await uploadMsgFile(file, file.name);
-        fileName = file.name;
-      }
-      
-      const messageToSend: any = {
-        ...message
+      // Create the base message data with timestamp
+      const messageData: any = {
+        ...message,
+        timestamp: Timestamp.now(),
+        read: false
       };
       
-      // Only add fileUrl and fileName if they have values
-      if (fileUrl) {
-        messageToSend.fileUrl = fileUrl;
+      // If a file is provided, upload it and add the file info to the message
+      if (file) {
+        try {
+          const fileUrl = await uploadFile(file, file.name);
+          messageData.fileUrl = fileUrl;
+          messageData.fileName = file.name;
+        } catch (fileError: any) {
+          console.error('Error uploading file:', fileError);
+          // Since we're using only local storage now, we don't need a fallback
+          throw new Error(`File upload failed: ${fileError.message || 'Unknown error'}. The message was not sent.`);
+        }
       }
       
-      if (fileName) {
-        messageToSend.fileName = fileName;
-      }
-      
-      const result = await sendMsg(messageToSend);
+      const result = await sendMsg(messageData);
       return result;
     } catch (err: any) {
       setError('Failed to send message');
-      throw new Error(err.message || err.toString() || 'Failed to send message. Please try again.');
+      console.error('Error sending message:', err);
+      // More specific error message
+      const errorMessage = err.message || err.toString() || 'Failed to send message. Please try again.';
+      throw new Error(errorMessage);
     }
   };
 
@@ -525,6 +575,46 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // Add dropdown data functions
+  const addDropdownData = async (data: Omit<DropdownData, 'id' | 'createdAt'>) => {
+    try {
+      const newData = {
+        ...data,
+        createdAt: new Date().toISOString(),
+      };
+      const createdData = await createDropdownData(newData);
+      setDropdownData(prev => [...prev, createdData as DropdownData]);
+    } catch (err) {
+      console.error('Error adding dropdown data:', err);
+      setError('Failed to add dropdown data');
+      throw err;
+    }
+  };
+
+  const updateDropdownData = async (id: string, data: Partial<DropdownData>) => {
+    try {
+      await updateDropdownDataService(id, data);
+      setDropdownData(prev => 
+        prev.map(item => item.id === id ? { ...item, ...data } : item)
+      );
+    } catch (err) {
+      console.error('Error updating dropdown data:', err);
+      setError('Failed to update dropdown data');
+      throw err;
+    }
+  };
+
+  const deleteDropdownData = async (id: string) => {
+    try {
+      await deleteDropdownDataService(id);
+      setDropdownData(prev => prev.filter(item => item.id !== id));
+    } catch (err) {
+      console.error('Error deleting dropdown data:', err);
+      setError('Failed to delete dropdown data');
+      throw err;
+    }
+  };
+
   return (
     <DataContext.Provider
       value={{
@@ -534,6 +624,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         serviceCharges,
         invoiceHistory,
         profitLossReports,
+        messages,
+        dropdownData, // Add this line
         loading,
         error,
         addEmployee,
@@ -546,10 +638,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         deleteExpense,
         addInvoice,
         addInvoiceHistory,
-        deleteInvoiceHistory, // Add deleteInvoiceHistory to provider value
+        deleteInvoiceHistory,
         addServiceCharge,
         updateServiceCharge,
         deleteServiceCharge,
+        // Add dropdown data functions to provider value
+        addDropdownData,
+        updateDropdownData,
+        deleteDropdownData,
         // Message functions
         sendMessage,
         getUserMessages,

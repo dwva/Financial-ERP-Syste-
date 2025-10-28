@@ -18,6 +18,7 @@ import {
   uploadBytes, 
   getDownloadURL 
 } from 'firebase/storage';
+import { saveMessageFile } from '@/services/messageFileService'; // Import local storage service
 
 // Collection references
 const messagesCollection = collection(db, 'messages');
@@ -59,15 +60,13 @@ export const sendMessage = async (message: Omit<Message, 'id' | 'timestamp'>) =>
 // Upload a file and return its download URL
 export const uploadFile = async (file: File, fileName: string) => {
   try {
-    console.log('Uploading file to Firebase Storage:', { fileName, fileSize: file.size, fileType: file.type });
-    const fileRef = ref(storage, `messages/${Date.now()}_${fileName}`);
-    const snapshot = await uploadBytes(fileRef, file);
-    const downloadURL = await getDownloadURL(snapshot.ref);
-    console.log('File uploaded successfully:', downloadURL);
-    return downloadURL;
-  } catch (error) {
+    console.log('Uploading file:', { fileName, fileSize: file.size, fileType: file.type });
+    const localFileResult = await saveMessageFile(file);
+    console.log('File saved:', localFileResult);
+    return localFileResult.url;
+  } catch (error: any) {
     console.error('Error uploading file:', error);
-    throw error;
+    throw new Error(`File upload failed: ${error.message || 'Unknown error'}`);
   }
 };
 
@@ -194,11 +193,3 @@ export const deleteMessage = async (messageId: string) => {
     throw error;
   }
 };
-
-
-
-
-
-
-
-

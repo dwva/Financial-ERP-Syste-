@@ -24,7 +24,7 @@ interface NotificationContextType {
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
 
 export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { expenses } = useData();
+  const { expenses, messages } = useData(); // Add messages from DataContext
   const [notifications, setNotifications] = useState<Notification[]>(() => {
     try {
       const saved = localStorage.getItem('admin_notifications');
@@ -55,6 +55,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     return [];
   });
   const [previousExpenses, setPreviousExpenses] = useState<any[]>([]);
+  const [previousMessages, setPreviousMessages] = useState<any[]>([]); // Track previous messages
 
   // Calculate unread count
   const unreadCount = notifications.filter(notification => !notification.read).length;
@@ -136,6 +137,42 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       console.error('Error in expense notification effect:', e);
     }
   }, [expenses]);
+
+  // Detect new messages and create notifications
+  useEffect(() => {
+    try {
+      // Initialize previousMessages on first render
+      if (previousMessages.length === 0 && messages.length > 0) {
+        setPreviousMessages(messages);
+        return;
+      }
+
+      // Check for new messages
+      const newMessages = messages.filter(
+        message => !previousMessages.some(prev => prev.id === message.id) && 
+                  !message.read // Only notify about unread messages
+      );
+
+      // Add notifications for new messages
+      newMessages.forEach(message => {
+        try {
+          addNotification({
+            title: 'New Message Received',
+            message: `You have a new message from ${message.senderName || 'Unknown'}`,
+            type: 'new_message',
+            messageId: message.id
+          });
+        } catch (e) {
+          console.error('Error creating new message notification:', e);
+        }
+      });
+
+      // Update previous messages
+      setPreviousMessages(messages);
+    } catch (e) {
+      console.error('Error in message notification effect:', e);
+    }
+  }, [messages]);
 
   const addNotification = (notification: Omit<Notification, 'id' | 'timestamp' | 'read'>) => {
     try {

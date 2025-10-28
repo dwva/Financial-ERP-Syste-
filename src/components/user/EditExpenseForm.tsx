@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useData } from '@/contexts/DataContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,8 +12,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'react-toastify';
-import { PlusCircle, Upload, X, FileText, Image as ImageIcon, Calendar, Save } from 'lucide-react';
+import { PlusCircle, Upload, X, FileText, Image as ImageIcon, Calendar, Save, Search } from 'lucide-react';
 
 interface EditExpenseFormProps {
   expense: any;
@@ -22,19 +23,99 @@ interface EditExpenseFormProps {
 }
 
 const EditExpenseForm = ({ expense, onCancel, onSave }: EditExpenseFormProps) => {
-  const { updateExpense, refreshData } = useData();
+  const { updateExpense, dropdownData, serviceCharges } = useData();
   const [amount, setAmount] = useState(expense.amount.toString());
   const [description, setDescription] = useState(expense.description);
   const [date, setDate] = useState(expense.date);
   const [company, setCompany] = useState(expense.company);
-  const [clientName, setClientName] = useState(expense.clientName || ''); // Add clientName state
-  const [candidateName, setCandidateName] = useState(expense.candidateName || ''); // Add candidateName state
+  const [clientName, setClientName] = useState(expense.clientName || '');
+  const [candidateName, setCandidateName] = useState(expense.candidateName || '');
   const [sector, setSector] = useState(expense.sector);
-  const [serviceName, setServiceName] = useState(expense.serviceName || ''); // Add serviceName state
+  const [serviceName, setServiceName] = useState(expense.serviceName || '');
+  const [overdue, setOverdue] = useState(expense.overdue || false);
   const [file, setFile] = useState<File | null>(null);
   const [filePreview, setFilePreview] = useState<string | null>(expense.file);
   const [fileName, setFileName] = useState<string | null>(expense.fileName);
   const [loading, setLoading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  
+  // Autocomplete states for client name
+  const [clientSearch, setClientSearch] = useState(expense.clientName || '');
+  const [showClientSuggestions, setShowClientSuggestions] = useState(false);
+  const clientInputRef = useRef<HTMLDivElement>(null);
+  const clientSuggestionsRef = useRef<HTMLDivElement>(null);
+  const sectorServiceRef = useRef<HTMLDivElement>(null);
+
+  // Filter dropdown data by type
+  const companyOptions = useMemo(() => 
+    dropdownData.filter(item => item.type === 'company').map(item => item.value), 
+    [dropdownData]
+  );
+  
+  const clientOptions = useMemo(() => 
+    dropdownData.filter(item => item.type === 'client').map(item => item.value), 
+    [dropdownData]
+  );
+  
+  const candidateOptions = useMemo(() => 
+    dropdownData.filter(item => item.type === 'candidate').map(item => item.value), 
+    [dropdownData]
+  );
+  
+  const sectorOptions = useMemo(() => 
+    dropdownData.filter(item => item.type === 'sector').map(item => item.value), 
+    [dropdownData]
+  );
+
+  // Filter service charges based on search term and sort alphabetically
+  const filteredServiceCharges = useMemo(() => {
+    if (!searchTerm) return [...serviceCharges].sort((a, b) => a.name.localeCompare(b.name));
+    return serviceCharges
+      .filter(service => 
+        service.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (service.sector && service.sector.toLowerCase().includes(searchTerm.toLowerCase()))
+      )
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [serviceCharges, searchTerm]);
+
+  // Filter client suggestions based on search term (alphabetically sorted)
+  const clientSuggestions = useMemo(() => {
+    if (!clientSearch) return [];
+    return clientOptions
+      .filter(option => 
+        option.toLowerCase().includes(clientSearch.toLowerCase())
+      )
+      .sort() // Sort alphabetically
+      .slice(0, 10); // Limit to 10 suggestions
+  }, [clientOptions, clientSearch]);
+
+  // Handle click outside to close suggestions
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      // Close client suggestions
+      if (
+        clientInputRef.current && 
+        !clientInputRef.current.contains(event.target as Node) &&
+        clientSuggestionsRef.current && 
+        !clientSuggestionsRef.current.contains(event.target as Node)
+      ) {
+        setShowClientSuggestions(false);
+      }
+      
+      // Close service suggestions
+      if (
+        sectorServiceRef.current && 
+        !sectorServiceRef.current.contains(event.target as Node)
+      ) {
+        setSearchTerm('');
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -61,6 +142,19 @@ const EditExpenseForm = ({ expense, onCancel, onSave }: EditExpenseFormProps) =>
     setFileName(null);
   };
 
+  const handleClientSelect = (client: string) => {
+    setClientName(client);
+    setClientSearch(client);
+    setShowClientSuggestions(false);
+  };
+
+  const handleServiceSelect = (service: any) => {
+    setServiceName(service.name);
+    setSector(service.sector || '');
+    setSearchTerm('');
+    toast.success('Service selected successfully!');
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -73,15 +167,34 @@ const EditExpenseForm = ({ expense, onCancel, onSave }: EditExpenseFormProps) =>
     setLoading(true);
     
     try {
-      // Convert file to base64 if it exists
-      let fileBase64 = expense.file; // Keep existing file if no new file
+      // Upload file to server if it exists
+      let fileUrl = expense.file; // Keep existing file if no new file
+      let newFileName = expense.fileName; // Keep existing file name if no new file
       if (file) {
-        fileBase64 = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = reject;
-          reader.readAsDataURL(file);
-        });
+        try {
+          const formData = new FormData();
+          formData.append('file', file);
+          
+          // Use the file server URL (port 3002)
+          const uploadUrl = `${window.location.protocol}//${window.location.hostname}:3002/upload`;
+          
+          const response = await fetch(uploadUrl, {
+            method: 'POST',
+            body: formData,
+          });
+          
+          if (!response.ok) {
+            throw new Error(`Failed to upload file: ${response.status} ${response.statusText}`);
+          }
+          
+          const result = await response.json();
+          fileUrl = result.file.url;
+          newFileName = file.name;
+        } catch (uploadError) {
+          console.error('Error uploading file:', uploadError);
+          toast.error(`Failed to upload file: ${uploadError.message || 'Please try again'}`);
+          throw uploadError;
+        }
       }
 
       // Create expense object with updated properties
@@ -90,12 +203,13 @@ const EditExpenseForm = ({ expense, onCancel, onSave }: EditExpenseFormProps) =>
         description,
         date,
         company,
-        clientName, // Include clientName in the data
-        candidateName, // Include candidateName in the data
+        clientName,
+        candidateName,
         sector,
-        serviceName, // Include serviceName in the data
-        file: fileBase64,
-        fileName: fileName
+        serviceName,
+        overdue,
+        file: fileUrl,
+        fileName: newFileName
       };
 
       console.log('Updating expense data:', expenseData);
@@ -103,9 +217,6 @@ const EditExpenseForm = ({ expense, onCancel, onSave }: EditExpenseFormProps) =>
       await updateExpense(expense.id, expenseData);
 
       toast.success('Expense updated successfully!');
-      
-      // Refresh data to show the updated expense
-      await refreshData();
       
       // Notify parent component
       onSave();
@@ -165,6 +276,18 @@ const EditExpenseForm = ({ expense, onCancel, onSave }: EditExpenseFormProps) =>
           <div className="grid gap-5 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="company">Company</Label>
+              <Select value={company} onValueChange={setCompany}>
+                <SelectTrigger className="h-11">
+                  <SelectValue placeholder="Select company" />
+                </SelectTrigger>
+                <SelectContent>
+                  {companyOptions.map((option, index) => (
+                    <SelectItem key={index} value={option}>
+                      {option}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <Input
                 id="company"
                 type="text"
@@ -172,62 +295,129 @@ const EditExpenseForm = ({ expense, onCancel, onSave }: EditExpenseFormProps) =>
                 value={company}
                 onChange={(e) => setCompany(e.target.value)}
                 required
-                className="h-11"
+                className="h-11 mt-2"
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="clientName">Client Name *</Label>
-              <Input
-                id="clientName"
-                type="text"
-                placeholder="Enter client name"
-                value={clientName}
-                onChange={(e) => setClientName(e.target.value)}
-                required
-                className="h-11"
-              />
+              <div className="relative" ref={clientInputRef}>
+                <Input
+                  id="clientName"
+                  type="text"
+                  placeholder="Type to search clients..."
+                  value={clientSearch}
+                  onChange={(e) => {
+                    setClientSearch(e.target.value);
+                    // Also update clientName to keep them in sync
+                    setClientName(e.target.value);
+                    setShowClientSuggestions(true);
+                  }}
+                  onFocus={() => setShowClientSuggestions(true)}
+                  required
+                  className="h-11"
+                />
+                {showClientSuggestions && clientSuggestions.length > 0 && (
+                  <div 
+                    ref={clientSuggestionsRef}
+                    className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto"
+                  >
+                    {clientSuggestions.map((client, index) => (
+                      <div
+                        key={index}
+                        className="px-4 py-2 hover:bg-gray-100 cursor-pointer text-sm"
+                        onClick={() => handleClientSelect(client)}
+                      >
+                        {client}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
           
           <div className="grid gap-5 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="candidateName">Candidate Name</Label>
+              <Select value={candidateName} onValueChange={setCandidateName}>
+                <SelectTrigger className="h-11">
+                  <SelectValue placeholder="Select candidate" />
+                </SelectTrigger>
+                <SelectContent>
+                  {candidateOptions.map((option, index) => (
+                    <SelectItem key={index} value={option}>
+                      {option}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <Input
                 id="candidateName"
                 type="text"
                 placeholder="Enter candidate name"
                 value={candidateName}
                 onChange={(e) => setCandidateName(e.target.value)}
-                className="h-11"
+                className="h-11 mt-2"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="sector">Sector</Label>
-              <Input
-                id="sector"
-                type="text"
-                placeholder="Enter sector"
-                value={sector}
-                onChange={(e) => setSector(e.target.value)}
-                required
-                className="h-11"
-              />
+              <Label htmlFor="sectorService">Sector/Service *</Label>
+              <div className="relative" ref={sectorServiceRef}>
+                <div className="flex items-center">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    id="sectorService"
+                    placeholder="Search and select service"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10 h-11"
+                  />
+                </div>
+                
+                {searchTerm && (
+                  <div className="absolute z-10 mt-1 w-full bg-white border rounded-md shadow-lg max-h-60 overflow-auto">
+                    {filteredServiceCharges.length > 0 ? (
+                      filteredServiceCharges.map((service) => (
+                        <div
+                          key={service.id}
+                          className="px-4 py-2 hover:bg-muted cursor-pointer flex justify-between items-center"
+                          onClick={() => handleServiceSelect(service)}
+                        >
+                          <div>
+                            <span>{service.name}</span>
+                            {service.sector && (
+                              <span className="text-xs text-muted-foreground ml-2">({service.sector})</span>
+                            )}
+                          </div>
+                          <span className="text-muted-foreground">₹{service.amount.toFixed(2)}</span>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="px-4 py-2 text-muted-foreground">No services found</div>
+                    )}
+                  </div>
+                )}
+                
+                {/* Display selected sector and service */}
+                {(sector || serviceName) && (
+                  <div className="mt-2 p-3 bg-muted rounded-md">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Selected Sector</Label>
+                        <div className="font-medium">{sector || 'None'}</div>
+                      </div>
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Selected Service</Label>
+                        <div className="font-medium">{serviceName || 'None'}</div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
           
           <div className="grid gap-5 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="serviceName">Service Name *</Label>
-              <Input
-                id="serviceName"
-                type="text"
-                placeholder="Enter service name"
-                value={serviceName}
-                onChange={(e) => setServiceName(e.target.value)}
-                required
-                className="h-11"
-              />
-            </div>
             <div className="space-y-2">
               <Label htmlFor="description">Description</Label>
               <Textarea
@@ -239,6 +429,36 @@ const EditExpenseForm = ({ expense, onCancel, onSave }: EditExpenseFormProps) =>
                 rows={3}
               />
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="status">User Status</Label>
+              <Select value={expense.userId ? expense.userId.split('@')[0] : ''} disabled>
+                <SelectTrigger className="h-11">
+                  <SelectValue placeholder="User status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="employee">Employee</SelectItem>
+                  <SelectItem value="founder">Founder</SelectItem>
+                  <SelectItem value="manager">Manager</SelectItem>
+                  <SelectItem value="intern">Intern</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-sm text-muted-foreground">Status is managed in user profile settings</p>
+            </div>
+          </div>
+          
+          <div className="space-y-2">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="overdue"
+                checked={overdue}
+                onCheckedChange={(checked) => setOverdue(checked as boolean)}
+              />
+              <Label htmlFor="overdue">Mark as Overdue</Label>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Check this box if this expense is overdue (payment not received)
+            </p>
           </div>
 
           <div className="space-y-2">

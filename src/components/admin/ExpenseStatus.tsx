@@ -1,18 +1,54 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useData } from '@/contexts/DataContext';
+import { useNotification } from '@/contexts/NotificationContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { CheckCircle, Clock, FileText, Image as ImageIcon, ChevronDown, ChevronRight } from 'lucide-react';
+import { CheckCircle, Clock, FileText, Image as ImageIcon, ChevronDown, ChevronRight, AlertTriangle } from 'lucide-react';
 import { toast } from 'react-toastify';
 
 const ExpenseStatus = () => {
   const { expenses, employees, updateExpense } = useData();
+  const { addNotification } = useNotification();
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [expandedClients, setExpandedClients] = useState<Record<string, boolean>>({});
   const [allExpanded, setAllExpanded] = useState<boolean>(false);
+
+  // Check for overdue expenses and create notifications
+  useEffect(() => {
+    const checkOverdueExpenses = () => {
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      
+      const overdueExpenses = expenses.filter(expense => {
+        // Check if expense is not received and older than 30 days
+        const expenseDate = new Date(expense.date);
+        const isOverdue = expenseDate < thirtyDaysAgo;
+        const isNotReceived = (expense.status || 'pending') !== 'received';
+        
+        return isOverdue && isNotReceived;
+      });
+      
+      // Create notifications for overdue expenses
+      overdueExpenses.forEach(expense => {
+        const employee = employees.find(emp => emp.email === expense.userId);
+        const expenseDate = new Date(expense.date);
+        const daysOverdue = Math.floor((new Date().getTime() - expenseDate.getTime()) / (1000 * 60 * 60 * 24));
+        
+        addNotification({
+          title: 'Overdue Expense Alert',
+          message: `Expense from ${employee?.name || expense.userId} is overdue by ${daysOverdue} days and payment status is not received`,
+          type: 'expense_updated',
+          expenseId: expense.id
+        });
+      });
+    };
+    
+    // Run the check when component mounts
+    checkOverdueExpenses();
+  }, [expenses, employees, addNotification]);
 
   const getFileIcon = (fileName: string | null) => {
     if (!fileName) return <FileText className="w-4 h-4" />;
@@ -96,8 +132,23 @@ const ExpenseStatus = () => {
     setAllExpanded(!allExpanded);
   };
 
+  // Calculate overdue expenses for display
+  const getOverdueExpenses = () => {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    
+    return expenses.filter(expense => {
+      const expenseDate = new Date(expense.date);
+      const isOverdue = expenseDate < thirtyDaysAgo;
+      const isNotReceived = (expense.status || 'pending') !== 'received';
+      
+      return isOverdue && isNotReceived;
+    });
+  };
+
   const pendingCount = expenses.filter(expense => (expense.status || 'pending') === 'pending').length;
   const receivedCount = expenses.filter(expense => expense.status === 'received').length;
+  const overdueCount = getOverdueExpenses().length;
 
   return (
     <Card>
@@ -124,6 +175,15 @@ const ExpenseStatus = () => {
                 <p className="text-2xl font-bold">{receivedCount}</p>
                 <p className="text-sm text-muted-foreground">Received</p>
               </div>
+              {overdueCount > 0 && (
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-orange-500">{overdueCount}</p>
+                  <p className="text-sm text-muted-foreground flex items-center justify-center">
+                    <AlertTriangle className="w-4 h-4 mr-1 text-orange-500" />
+                    Overdue
+                  </p>
+                </div>
+              )}
             </div>
           </div>
           
@@ -172,89 +232,128 @@ const ExpenseStatus = () => {
                   </TableCell>
                 </TableRow>
               ) : (
-                Object.entries(groupedExpenses).map(([clientName, clientExpenses]) => (
-                  <React.Fragment key={clientName}>
-                    {/* Client Group Header */}
-                    <TableRow className="bg-muted/50">
-                      <TableCell colSpan={10} className="font-bold py-3">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => toggleClientExpansion(clientName)}
-                              className="p-1 h-6 w-6 mr-2"
-                            >
-                              {expandedClients[clientName] ? (
-                                <ChevronDown className="w-4 h-4" />
-                              ) : (
-                                <ChevronRight className="w-4 h-4" />
-                              )}
-                            </Button>
-                            <span>Client: {clientName}</span>
-                            <Badge variant="secondary" className="ml-2">
-                              {clientExpenses.length} expenses
-                            </Badge>
-                          </div>
-                          <div className="text-right">
-                            <Badge variant="outline">
-                              Total: {formatAmount(clientExpenses.reduce((sum, exp) => sum + exp.amount, 0))}
-                            </Badge>
-                          </div>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                    
-                    {/* Client Expenses */}
-                    {expandedClients[clientName] && clientExpenses.map((expense) => {
-                      const employee = employees.find(emp => emp.email === expense.userId);
-                      return (
-                        <TableRow key={expense.id}>
-                          <TableCell className="pl-8 font-medium">
-                            {employee?.name || expense.userId.split('@')[0]}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="secondary" className="font-semibold">
-                              {formatAmount(expense.amount)}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>{expense.description}</TableCell>
-                          <TableCell>{expense.clientName || 'N/A'}</TableCell>
-                          <TableCell>{expense.company || 'N/A'}</TableCell>
-                          <TableCell>{expense.sector || 'N/A'}</TableCell>
-                          <TableCell>
+                Object.entries(groupedExpenses).map(([clientName, clientExpenses]) => {
+                  // Check if any expenses in this group are overdue
+                  const thirtyDaysAgo = new Date();
+                  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+                  
+                  const hasOverdueExpenses = clientExpenses.some(expense => {
+                    const expenseDate = new Date(expense.date);
+                    const isOverdue = expenseDate < thirtyDaysAgo;
+                    const isNotReceived = (expense.status || 'pending') !== 'received';
+                    return isOverdue && isNotReceived;
+                  });
+                  
+                  return (
+                    <React.Fragment key={clientName}>
+                      {/* Client Group Header */}
+                      <TableRow className={`bg-muted/50 ${hasOverdueExpenses ? 'bg-orange-50' : ''}`}>
+                        <TableCell colSpan={10} className="font-bold py-3">
+                          <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                              {getFileIcon(expense.fileName)}
-                              <span className="text-sm text-muted-foreground">
-                                {expense.fileName || 'No file'}
-                              </span>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => toggleClientExpansion(clientName)}
+                                className="p-1 h-6 w-6 mr-2"
+                              >
+                                {expandedClients[clientName] ? (
+                                  <ChevronDown className="w-4 h-4" />
+                                ) : (
+                                  <ChevronRight className="w-4 h-4" />
+                                )}
+                              </Button>
+                              <span>Client: {clientName}</span>
+                              {hasOverdueExpenses && (
+                                <Badge variant="destructive" className="ml-2 flex items-center">
+                                  <AlertTriangle className="w-3 h-3 mr-1" />
+                                  Overdue Expenses
+                                </Badge>
+                              )}
+                              <Badge variant="secondary" className="ml-2">
+                                {clientExpenses.length} expenses
+                              </Badge>
                             </div>
-                          </TableCell>
-                          <TableCell className="text-muted-foreground">
-                            {formatDate(expense.date)}
-                          </TableCell>
-                          <TableCell>
-                            {getStatusBadge(expense.status || 'pending')}
-                          </TableCell>
-                          <TableCell>
-                            <Select 
-                              value={expense.status || 'pending'} 
-                              onValueChange={(value) => handleStatusChange(expense.id, value)}
-                            >
-                              <SelectTrigger className="w-32">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="pending">Pending</SelectItem>
-                                <SelectItem value="received">Received</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </React.Fragment>
-                ))
+                            <div className="text-right">
+                              <Badge variant="outline">
+                                Total: {formatAmount(clientExpenses.reduce((sum, exp) => sum + exp.amount, 0))}
+                              </Badge>
+                            </div>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                      
+                      {/* Client Expenses */}
+                      {expandedClients[clientName] && clientExpenses.map((expense) => {
+                        // Check if this specific expense is overdue
+                        const thirtyDaysAgo = new Date();
+                        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+                        const expenseDate = new Date(expense.date);
+                        const isOverdue = expenseDate < thirtyDaysAgo;
+                        const isNotReceived = (expense.status || 'pending') !== 'received';
+                        const isOverdueExpense = isOverdue && isNotReceived;
+                        
+                        const employee = employees.find(emp => emp.email === expense.userId);
+                        return (
+                          <TableRow key={expense.id} className={isOverdueExpense ? 'bg-orange-50' : ''}>
+                            <TableCell className="pl-8 font-medium">
+                              {employee?.name || expense.userId.split('@')[0]}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="secondary" className="font-semibold">
+                                {formatAmount(expense.amount)}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center">
+                                {expense.description}
+                                {isOverdueExpense && (
+                                  <AlertTriangle className="w-4 h-4 ml-2 text-orange-500" />
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>{expense.clientName || 'N/A'}</TableCell>
+                            <TableCell>{expense.company || 'N/A'}</TableCell>
+                            <TableCell>{expense.sector || 'N/A'}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                {getFileIcon(expense.fileName)}
+                                <span className="text-sm text-muted-foreground">
+                                  {expense.fileName || 'No file'}
+                                </span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {formatDate(expense.date)}
+                              {isOverdueExpense && (
+                                <div className="text-xs text-orange-500">
+                                  {Math.floor((new Date().getTime() - expenseDate.getTime()) / (1000 * 60 * 60 * 24))} days overdue
+                                </div>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {getStatusBadge(expense.status || 'pending')}
+                            </TableCell>
+                            <TableCell>
+                              <Select 
+                                value={expense.status || 'pending'} 
+                                onValueChange={(value) => handleStatusChange(expense.id, value)}
+                              >
+                                <SelectTrigger className="w-32">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="pending">Pending</SelectItem>
+                                  <SelectItem value="received">Received</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </React.Fragment>
+                  );
+                })
               )}
             </TableBody>
           </Table>

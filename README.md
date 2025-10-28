@@ -10,6 +10,7 @@ A comprehensive financial management system for enterprises with user dashboards
 - User profile management
 - Real-time data synchronization
 - Responsive design for all devices
+- Message system with file attachments
 
 ## Tech Stack
 
@@ -17,6 +18,7 @@ A comprehensive financial management system for enterprises with user dashboards
 - **UI Components**: Shadcn UI, Tailwind CSS
 - **State Management**: React Context API
 - **Backend**: Firebase (Authentication & Firestore)
+- **File Storage**: Node.js Express Server with Multer
 - **Charts**: Recharts
 - **Notifications**: React Toastify
 
@@ -42,6 +44,20 @@ The system comes with pre-configured users for testing:
 
 - **Admin**: admin@company.com / admin123
 - **Regular User**: user@company.com / user123
+
+## File Attachment System
+
+This application includes a messaging system with file attachment capabilities. Files are handled differently based on the environment:
+
+### Development Mode
+- Files are stored in the browser's sessionStorage
+- File metadata is stored in localStorage
+- No server-side storage is used
+
+### Production Mode
+- Files are stored on the server in the `public/message-attachments` directory
+- A Node.js Express server handles file uploads
+- File metadata is still stored in the browser
 
 ## Getting Started
 
@@ -73,6 +89,25 @@ The system comes with pre-configured users for testing:
 npm run build
 ```
 
+### Starting the Production Servers
+
+For production deployment, you need to run both the frontend and the file server:
+
+1. Start the file upload server:
+   ```bash
+   npm run server
+   ```
+
+2. Start the frontend application:
+   ```bash
+   npm run preview
+   ```
+
+Alternatively, you can use PM2 with the provided ecosystem.config.js:
+```bash
+npx pm2 start ecosystem.config.js
+```
+
 ### Running Tests
 
 ```bash
@@ -90,6 +125,7 @@ src/
 ├── pages/               # Page components
 ├── scripts/             # Utility scripts
 ├── services/            # API and Firebase service functions
+├── server/              # File upload server
 └── App.tsx              # Main application component
 ```
 
@@ -98,6 +134,7 @@ src/
 - `npm run dev`: Start development server
 - `npm run build`: Build for production
 - `npm run preview`: Preview production build
+- `npm run server`: Start file upload server
 - `npm run lint`: Run ESLint
 
 ## Firebase Data Structure

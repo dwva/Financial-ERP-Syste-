@@ -20,6 +20,7 @@ const ProfitLoss = () => {
   const [expenseInvoiceMap, setExpenseInvoiceMap] = useState<Record<string, string>>({});
   const [savedInvoices, setSavedInvoices] = useState<Record<string, { invoiceNumber: string, amount: number }>>({});
   const [activeTab, setActiveTab] = useState<'current' | 'saved'>('current');
+  const [lastSavedReport, setLastSavedReport] = useState<ProfitLossReport | null>(null);
 
   // State for delete confirmation dialog
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -55,24 +56,24 @@ const ProfitLoss = () => {
     return Array.from(years).sort((a, b) => parseInt(b) - parseInt(a));
   }, [expenses]);
 
-  // Get all expense IDs that have been saved in reports
+  // Get all expense IDs that have been saved in the last saved report
   const reportedExpenseIds = useMemo(() => {
     const ids = new Set<string>();
-    profitLossReports.forEach(report => {
-      report.reportData.forEach(data => {
-        if (data.expenseId) {
+    if (lastSavedReport) {
+      lastSavedReport.reportData.forEach(data => {
+        if (data.expenseId && data.invoiceNumber) {
           ids.add(data.expenseId);
         }
       });
-    });
+    }
     return ids;
-  }, [profitLossReports]);
+  }, [lastSavedReport]);
 
-  // Filter expenses by month and year, and exclude those already in reports
+  // Filter expenses by month and year, and exclude only those in the last saved report
   const filteredExpenses = useMemo(() => {
     let filtered = [...expenses];
     
-    // Exclude expenses that are already in reports
+    // Exclude expenses that are in the last saved report and have invoice numbers
     filtered = filtered.filter(expense => !reportedExpenseIds.has(expense.id));
     
     if (filterMonth !== 'all') {
@@ -282,6 +283,15 @@ const ProfitLoss = () => {
       
       // Save to database
       await addProfitLossReport(report);
+      
+      // Update last saved report to filter out expenses with invoice numbers
+      const createdReport: ProfitLossReport = {
+        ...report,
+        id: Date.now().toString(), // Temporary ID, will be replaced by actual ID from DB
+        createdAt: new Date().toISOString()
+      } as ProfitLossReport;
+      setLastSavedReport(createdReport);
+      
       toast.success('Profit/Loss report saved successfully!');
     } catch (error: any) {
       console.error('Error saving report:', error);
@@ -655,6 +665,7 @@ const ProfitLoss = () => {
                   <TableHead>Period</TableHead>
                   <TableHead>Month</TableHead>
                   <TableHead>Year</TableHead>
+                  <TableHead>Client/Company</TableHead>
                   <TableHead className="text-right">Revenue</TableHead>
                   <TableHead className="text-right">Expenses</TableHead>
                   <TableHead className="text-right">Profit/Loss</TableHead>
@@ -670,6 +681,22 @@ const ProfitLoss = () => {
                       <TableCell className="font-medium capitalize">{report.period}</TableCell>
                       <TableCell>{report.month || 'N/A'}</TableCell>
                       <TableCell>{report.year}</TableCell>
+                      <TableCell>
+                        {report.reportData && report.reportData.length > 0 ? (
+                          <div className="flex flex-col gap-1">
+                            {report.reportData.slice(0, 3).map((data, index) => (
+                              <span key={index} className="text-sm">
+                                {data.clientName || data.company || 'N/A'}
+                              </span>
+                            ))}
+                            {report.reportData.length > 3 && (
+                              <span className="text-xs text-muted-foreground">
+                                +{report.reportData.length - 3} more
+                              </span>
+                            )}
+                          </div>
+                        ) : 'No data'}
+                      </TableCell>
                       <TableCell className="text-right text-green-600">{formatAmount(report.revenue)}</TableCell>
                       <TableCell className="text-right text-red-600">{formatAmount(report.expenses)}</TableCell>
                       <TableCell className={`text-right font-medium ${report.profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
@@ -696,7 +723,7 @@ const ProfitLoss = () => {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                       No saved reports found
                     </TableCell>
                   </TableRow>

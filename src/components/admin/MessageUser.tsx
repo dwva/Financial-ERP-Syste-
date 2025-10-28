@@ -13,9 +13,10 @@ import { Message } from '@/services/messageService';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Send, RefreshCw, FileText, Clock, Download, Trash2 } from 'lucide-react';
 import { toast } from 'react-toastify';
+import { downloadLocalFile } from '@/services/messageFileService';
 
 const MessageUser = () => {
-  const { employees, sendMessage, getAdminMessages, getAllMessages, getMessageById, getUserMessages, deleteMessage } = useData();
+  const { employees, sendMessage, messages, loading: dataLoading, deleteMessage } = useData(); // Add deleteMessage
   const { user } = useAuth();
   const [selectedUser, setSelectedUser] = useState<string>('');
   const [subject, setSubject] = useState<string>('');
@@ -30,183 +31,14 @@ const MessageUser = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState<boolean>(false);
   const [messageToDelete, setMessageToDelete] = useState<{ id: string; subject: string } | null>(null);
 
-  // Get admin's sent messages with retry mechanism
-  const fetchSentMessages = async (retryCount = 3) => {
-    console.log('=== fetchSentMessages called ===');
-    console.log('User object:', user);
-    console.log('User email:', user?.email);
-    console.log('User email type:', typeof user?.email);
-    console.log('User email value:', JSON.stringify(user?.email));
-    
-    if (user?.email) {
-      try {
-        setIndexError(false);
-        setRefreshing(true);
-        console.log('Fetching messages for admin with email:', user.email);
-        
-        // First try the Firebase query
-        let messages = [];
-        try {
-          console.log('Calling getAdminMessages with:', user.email);
-          messages = await getAdminMessages(user.email);
-          console.log('getAdminMessages returned:', messages);
-          console.log('Number of messages:', messages.length);
-        } catch (queryError: any) {
-          console.log('Firebase query failed:', queryError.message);
-          console.log('Error details:', queryError);
-          console.log('Error code:', queryError.code);
-          // If Firebase query fails due to index requirements, fall back to client-side filtering
-          if (queryError.message && queryError.message.includes('query requires an index')) {
-            setIndexError(true);
-            toast.info('Setting up message history for the first time. This may take a moment.');
-            // Retry after a short delay to allow index creation
-            if (retryCount > 0) {
-              console.log(`Retrying in 3 seconds... (${retryCount} attempts left)`);
-              setTimeout(() => {
-                fetchSentMessages(retryCount - 1);
-              }, 3000);
-              return;
-            }
-          } else {
-            console.log('Falling back to client-side filtering');
-            const allMessages = await getAllMessages();
-            console.log('getAllMessages returned:', allMessages);
-            console.log('Filtering messages for senderId:', user.email);
-            messages = allMessages.filter((msg: any) => {
-              const isMatch = msg.senderId === user.email;
-              console.log(`Message ${msg.id}: senderId=${msg.senderId} (type: ${typeof msg.senderId}), filter=${user.email} (type: ${typeof user.email}), match=${isMatch}`);
-              return isMatch;
-            });
-            console.log('Filtered messages:', messages);
-          }
-        }
-        
-        console.log('Final messages array:', messages);
-        console.log('Number of messages fetched:', messages.length);
-        
-        // Log details of each message for debugging
-        messages.forEach((msg: any, index: number) => {
-          console.log(`Message ${index + 1}:`, {
-            id: msg.id,
-            senderId: msg.senderId,
-            receiverId: msg.receiverId,
-            subject: msg.subject,
-            timestamp: msg.timestamp?.toDate ? msg.timestamp.toDate() : msg.timestamp
-          });
-        });
-        
-        setSentMessages(messages);
-        
-        // Show success message if messages were fetched
-        if (messages.length > 0) {
-          console.log(`Successfully loaded ${messages.length} messages`);
-          toast.success(`Loaded ${messages.length} messages`);
-        } else {
-          console.log('No messages found for this admin');
-          // Let's check if there are ANY messages at all
-          try {
-            const allMessages = await getAllMessages();
-            console.log('Total messages in system:', allMessages.length);
-            if (allMessages.length > 0) {
-              console.log('Messages exist but none match senderId:', user.email);
-              toast.info(`No messages found in your history. There are ${allMessages.length} total messages in the system.`);
-            } else {
-              console.log('No messages at all in the system');
-              toast.info('No messages found in your history');
-            }
-          } catch (error) {
-            console.error('Error checking total messages:', error);
-            toast.info('No messages found in your history');
-          }
-        }
-      } catch (error: any) {
-        console.error('Error fetching sent messages:', error);
-        console.error('Error stack:', error.stack);
-        
-        // Handle index creation message
-        if (error.message && error.message.includes('query requires an index')) {
-          setIndexError(true);
-          toast.info('Setting up message history for the first time. This may take a moment.');
-          // Retry after a short delay to allow index creation
-          if (retryCount > 0) {
-            console.log(`Retrying in 3 seconds... (${retryCount} attempts left)`);
-            setTimeout(() => {
-              fetchSentMessages(retryCount - 1);
-            }, 3000);
-            return;
-          }
-        }
-        
-        // Retry mechanism for other errors
-        if (retryCount > 0 && !error.message?.includes('query requires an index')) {
-          console.log(`Retrying... (${retryCount} attempts left)`);
-          setTimeout(() => {
-            fetchSentMessages(retryCount - 1);
-          }, 1000);
-          return;
-        }
-        
-        // Provide more detailed error message to user
-        const errorMessage = error.message || 'Failed to load message history. Please try again.';
-        toast.error(errorMessage);
-      } finally {
-        setRefreshing(false);
-        setInitialLoading(false);
-      }
-    } else {
-      console.log('No user email available');
-      toast.error('User not logged in properly. Please refresh the page and log in again.');
-      setRefreshing(false);
+  // Filter messages to show only those sent by the current admin
+  useEffect(() => {
+    if (messages.length > 0 && user?.email) {
+      const adminMessages = messages.filter(msg => msg.senderId === user.email);
+      setSentMessages(adminMessages);
       setInitialLoading(false);
     }
-  };
-
-  // Manual refresh that bypasses any potential caching issues
-  const forceRefreshMessages = async () => {
-    if (!user?.email) return;
-    
-    setRefreshing(true);
-    try {
-      console.log('Force refreshing messages for:', user.email);
-      
-      // Try direct Firebase query first
-      console.log('Attempting direct Firebase query...');
-      const directMessages = await getAdminMessages(user.email);
-      console.log('Direct query result:', directMessages);
-      
-      if (directMessages && directMessages.length > 0) {
-        setSentMessages(directMessages);
-        toast.success(`Found ${directMessages.length} messages`);
-        return;
-      }
-      
-      // If that doesn't work, try getting all messages and filtering
-      console.log('Direct query returned no results, trying getAllMessages...');
-      const allMessages = await getAllMessages();
-      console.log('All messages in DB:', allMessages);
-      
-      const filteredMessages = allMessages.filter((msg: any) => {
-        const match = msg.senderId === user.email;
-        console.log(`Checking message ${msg.id}: senderId=${msg.senderId}, user.email=${user.email}, match=${match}`);
-        return match;
-      });
-      
-      console.log('Filtered messages:', filteredMessages);
-      setSentMessages(filteredMessages);
-      
-      if (filteredMessages.length === 0) {
-        toast.info('No messages found for your account');
-      } else {
-        toast.success(`Found ${filteredMessages.length} messages`);
-      }
-    } catch (error: any) {
-      console.error('Error in force refresh:', error);
-      toast.error(`Refresh failed: ${error.message || 'Unknown error'}`);
-    } finally {
-      setRefreshing(false);
-      setInitialLoading(false);
-    }
-  };
+  }, [messages, user]);
 
   // Function to delete a message
   const handleDeleteMessage = async (messageId: string, messageSubject: string) => {
@@ -231,11 +63,8 @@ const MessageUser = () => {
       setLoading(true);
       setDeleteDialogOpen(false);
       console.log('Deleting message with ID:', messageToDelete.id);
-      await deleteMessage(messageToDelete.id);
+      await deleteMessage(messageToDelete.id); // This should now be available
       console.log('Message deleted successfully');
-      
-      // Remove the message from the local state
-      setSentMessages(prevMessages => prevMessages.filter(msg => msg.id !== messageToDelete.id));
       
       toast.success('Message deleted successfully');
     } catch (error: any) {
@@ -255,30 +84,8 @@ const MessageUser = () => {
 
   // Wrapper function for refresh button onClick
   const handleRefreshClick = () => {
-    forceRefreshMessages();
+    setRefreshing(!refreshing); // Simple refresh toggle
   };
-
-  // Initialize component and fetch messages
-  useEffect(() => {
-    // Don't do anything if user is still loading
-    if (user === undefined) {
-      console.log('User still loading, waiting...');
-      return;
-    }
-    
-    // Show initial loading message
-    toast.info('Loading message history...', { autoClose: 1000 });
-    console.log('=== Component mounted ===');
-    console.log('User object:', user);
-    console.log('User email:', user?.email);
-    
-    if (user?.email) {
-      fetchSentMessages();
-    } else {
-      console.log('No user email available, skipping message fetch');
-      setInitialLoading(false);
-    }
-  }, [user, getAdminMessages]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -314,6 +121,7 @@ const MessageUser = () => {
       const receiver = employees.find(emp => emp.email === selectedUser);
       if (!receiver) {
         toast.error('Selected user not found');
+        setLoading(false);
         return;
       }
 
@@ -326,6 +134,7 @@ const MessageUser = () => {
       
       if (!isValidRecipient) {
         toast.error('Cannot send message to this user');
+        setLoading(false);
         return;
       }
 
@@ -338,7 +147,7 @@ const MessageUser = () => {
         });
       }
 
-      // Prepare the message data
+      // Prepare the message data (note: file handling is done in the DataContext)
       const messageData = {
         senderId: user.email,
         senderName: user.email, // Use email as sender name since displayName is not available
@@ -346,21 +155,18 @@ const MessageUser = () => {
         receiverName: receiver.name || receiver.email,
         subject,
         content,
-        read: false
+        read: false // Add the read property here
       };
 
       console.log('About to send message:', messageData);
 
-      // Send the message
+      // Send the message with file if provided
       const result = await sendMessage(messageData, file || undefined);
 
       console.log('Message sent result:', result);
       console.log('Message ID:', result.id);
 
       toast.success('Message sent successfully!');
-      
-      // Refresh message history to include the new message
-      await fetchSentMessages();
       
       // Reset form
       setSelectedUser('');
@@ -371,8 +177,15 @@ const MessageUser = () => {
     } catch (error: any) {
       console.error('Error sending message:', error);
       console.error('Error stack:', error.stack);
-      const errorMessage = error.message || error.toString() || 'Failed to send message. Please try again.';
-      toast.error(`Failed to send message: ${errorMessage}`);
+      
+      // Handle specific error cases
+      if (error.message && error.message.includes('File upload failed')) {
+        // Show a more informative error message
+        toast.error(`File upload failed: ${error.message}. The message was not sent.`);
+      } else {
+        const errorMessage = error.message || error.toString() || 'Failed to send message. Please try again.';
+        toast.error(`Failed to send message: ${errorMessage}`);
+      }
     } finally {
       setLoading(false);
     }
@@ -419,6 +232,24 @@ const MessageUser = () => {
     }
   };
 
+  // Function to download a file
+  const handleDownloadFile = (fileUrl: string, fileName: string) => {
+    // Check if this is a local file URL
+    if (fileUrl.startsWith('localfile://')) {
+      // Extract file ID from the URL
+      const fileId = fileUrl.split('://')[1].split('/')[0];
+      downloadLocalFile(fileId, fileName);
+    } else {
+      // For Firebase URLs, create a temporary link
+      const a = document.createElement('a');
+      a.href = fileUrl;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -426,6 +257,9 @@ const MessageUser = () => {
         <CardDescription>Send messages and files to specific users</CardDescription>
       </CardHeader>
       <CardContent>
+        {/* Remove the storage toggle component */}
+        {/* <StorageToggle /> */}
+        
         <Tabs defaultValue="compose" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="compose">Compose Message</TabsTrigger>
@@ -527,11 +361,11 @@ const MessageUser = () => {
                   <Button 
                     variant="outline" 
                     size="sm" 
-                    onClick={handleRefreshClick}
-                    disabled={refreshing}
+                    onClick={() => setRefreshing(!refreshing)} // Simple refresh toggle
+                    disabled={dataLoading || refreshing}
                   >
-                    <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-                    {refreshing ? 'Refreshing...' : 'Refresh'}
+                    <RefreshCw className={`w-4 h-4 mr-2 ${dataLoading || refreshing ? 'animate-spin' : ''}`} />
+                    {dataLoading || refreshing ? 'Refreshing...' : 'Refresh'}
                   </Button>
                 </div>
               </div>
@@ -605,13 +439,14 @@ const MessageUser = () => {
                                 <FileText className="w-4 h-4" />
                                 <span className="text-sm">{message.fileName}</span>
                                 {message.fileUrl && (
-                                  <a 
-                                    href={message.fileUrl} 
-                                    download={message.fileName}
-                                    className="ml-2 text-blue-600 hover:underline"
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleDownloadFile(message.fileUrl!, message.fileName!)}
+                                    className="ml-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50"
                                   >
                                     <Download className="w-4 h-4" />
-                                  </a>
+                                  </Button>
                                 )}
                               </div>
                             ) : (

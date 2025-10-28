@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useData } from '@/contexts/DataContext';
+import { useNotification } from '@/contexts/NotificationContext'; // Add this import
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -15,14 +16,17 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge'; // Add this import
 import AddExpenseForm from '@/components/user/AddExpenseForm';
 import MyExpensesTable from '@/components/user/MyExpensesTable';
-import MessagesPage from '@/components/user/MessagesPage'; // Add this import
-import { LogOut, Wallet, User, Calendar, Building, Hash, Camera, Mail } from 'lucide-react';
+import MessagesPage from '@/components/user/MessagesPage';
+import OverdueExpenses from '@/components/user/OverdueExpenses'; // Add this import
+import { LogOut, Wallet, User, Calendar, Building, Hash, Camera, Mail, AlertTriangle } from 'lucide-react';
 
 const UserDashboard = () => {
   const { user, logout } = useAuth();
   const { employees, updateEmployee, refreshData } = useData();
+  const { unreadCount } = useNotification(); // Add this hook
   const navigate = useNavigate();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [name, setName] = useState('');
@@ -243,14 +247,26 @@ const UserDashboard = () => {
 
       <main className="container mx-auto px-4 py-8">
         <Tabs defaultValue="expenses" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="expenses" className="flex items-center gap-2">
               <Wallet className="w-4 h-4" />
               My Expenses
             </TabsTrigger>
-            <TabsTrigger value="messages" className="flex items-center gap-2">
+            <TabsTrigger value="overdue" className="flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4" />
+              Overdue Expenses
+            </TabsTrigger>
+            <TabsTrigger value="messages" className="flex items-center gap-2 relative">
               <Mail className="w-4 h-4" />
               Messages
+              {unreadCount > 0 && (
+                <Badge 
+                  variant="destructive" 
+                  className="absolute -top-2 -right-2 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs"
+                >
+                  {unreadCount}
+                </Badge>
+              )}
             </TabsTrigger>
           </TabsList>
           
@@ -259,6 +275,10 @@ const UserDashboard = () => {
               <AddExpenseForm />
               <MyExpensesTable />
             </div>
+          </TabsContent>
+          
+          <TabsContent value="overdue">
+            <OverdueExpenses />
           </TabsContent>
           
           <TabsContent value="messages">

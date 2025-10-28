@@ -24,6 +24,7 @@ const serviceChargesCollection = collection(db, 'serviceCharges');
 const invoiceHistoryCollection = collection(db, 'invoiceHistory');
 const profitLossCollection = collection(db, 'profitLossReports');
 const messagesCollection = collection(db, 'messages');
+const dropdownDataCollection = collection(db, 'dropdownData'); // Add this line
 
 // Authentication operations
 export const createAdminUser = async (email: string, password: string) => {
@@ -515,4 +516,83 @@ export const getAllMessages = async () => {
     console.error('Error fetching all messages:', error);
     throw error;
   }
+};
+
+// Add real-time listener for messages
+export const onMessagesChange = (callback: (messages: any[]) => void) => {
+  return onSnapshot(messagesCollection, 
+    (querySnapshot) => {
+      const messages = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...(doc.data() as any)
+      }));
+      callback(messages);
+    },
+    (error) => {
+      console.error('Error in messages listener:', error);
+    }
+  );
+};
+
+// Add this section for dropdown data operations
+// Dropdown Data operations
+export const createDropdownData = async (data: any) => {
+  try {
+    const docRef = await addDoc(dropdownDataCollection, data);
+    return { id: docRef.id, ...data };
+  } catch (error) {
+    console.error('Error creating dropdown data:', error);
+    throw error;
+  }
+};
+
+export const getDropdownData = async () => {
+  try {
+    const querySnapshot = await getDocs(dropdownDataCollection);
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...(doc.data() as any)
+    }));
+  } catch (error) {
+    console.error('Error fetching dropdown data:', error);
+    throw error;
+  }
+};
+
+export const updateDropdownData = async (id: string, data: Partial<any>) => {
+  try {
+    const dropdownDoc = doc(db, 'dropdownData', id);
+    await updateDoc(dropdownDoc, data);
+    return { id, ...data };
+  } catch (error) {
+    console.error('Error updating dropdown data:', error);
+    throw error;
+  }
+};
+
+export const deleteDropdownData = async (id: string) => {
+  try {
+    const dropdownDoc = doc(db, 'dropdownData', id);
+    await deleteDoc(dropdownDoc);
+    return id;
+  } catch (error) {
+    console.error('Error deleting dropdown data:', error);
+    throw error;
+  }
+};
+
+// Add real-time listener for dropdown data
+export const onDropdownDataChange = (callback: (data: any[]) => void) => {
+  return onSnapshot(dropdownDataCollection, 
+    (querySnapshot) => {
+      const data = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...(doc.data() as any)
+      }));
+      callback(data);
+    },
+    (error) => {
+      console.error('Error in dropdown data listener:', error);
+    }
+  );
 };
