@@ -128,6 +128,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = async () => {
     try {
       await signOut(auth);
+      // Clear stored admin credentials
+      localStorage.removeItem('adminCredentials');
     } catch (error) {
       console.error('Logout error:', error);
     }

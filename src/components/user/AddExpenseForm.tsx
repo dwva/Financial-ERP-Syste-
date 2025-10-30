@@ -240,34 +240,15 @@ const AddExpenseForm = () => {
         isOverdue = dueDate < new Date();
       }
       
-      // Upload file to server if it exists
-      let fileUrl = null;
-      let fileName = null;
+      // Convert file to base64 if it exists
+      let fileBase64 = null;
       if (file) {
-        try {
-          const formData = new FormData();
-          formData.append('file', file);
-          
-          // Use the file server URL (port 3002)
-          const uploadUrl = `${window.location.protocol}//${window.location.hostname}:3002/upload`;
-          
-          const response = await fetch(uploadUrl, {
-            method: 'POST',
-            body: formData,
-          });
-          
-          if (!response.ok) {
-            throw new Error(`Failed to upload file: ${response.status} ${response.statusText}`);
-          }
-          
-          const result = await response.json();
-          fileUrl = result.file.url;
-          fileName = file.name;
-        } catch (uploadError) {
-          console.error('Error uploading file:', uploadError);
-          toast.error(`Failed to upload file: ${uploadError.message || 'Please try again'}`);
-          throw uploadError;
-        }
+        fileBase64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
       }
 
       // Create expense object with correct properties
@@ -283,8 +264,8 @@ const AddExpenseForm = () => {
         serviceName,
         overdue: isOverdue,
         overdueDays: overdueDays, // Add this line to save overdueDays
-        file: fileUrl,
-        fileName: fileName,
+        file: fileBase64,
+        fileName: file?.name || null,
       };
 
       console.log('Submitting expense data:', expenseData);

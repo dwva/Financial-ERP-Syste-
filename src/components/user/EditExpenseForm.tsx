@@ -167,34 +167,15 @@ const EditExpenseForm = ({ expense, onCancel, onSave }: EditExpenseFormProps) =>
     setLoading(true);
     
     try {
-      // Upload file to server if it exists
-      let fileUrl = expense.file; // Keep existing file if no new file
-      let newFileName = expense.fileName; // Keep existing file name if no new file
+      // Convert file to base64 if it exists
+      let fileBase64 = expense.file; // Keep existing file if no new file
       if (file) {
-        try {
-          const formData = new FormData();
-          formData.append('file', file);
-          
-          // Use the file server URL (port 3002)
-          const uploadUrl = `${window.location.protocol}//${window.location.hostname}:3002/upload`;
-          
-          const response = await fetch(uploadUrl, {
-            method: 'POST',
-            body: formData,
-          });
-          
-          if (!response.ok) {
-            throw new Error(`Failed to upload file: ${response.status} ${response.statusText}`);
-          }
-          
-          const result = await response.json();
-          fileUrl = result.file.url;
-          newFileName = file.name;
-        } catch (uploadError) {
-          console.error('Error uploading file:', uploadError);
-          toast.error(`Failed to upload file: ${uploadError.message || 'Please try again'}`);
-          throw uploadError;
-        }
+        fileBase64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
       }
 
       // Create expense object with updated properties
@@ -208,8 +189,8 @@ const EditExpenseForm = ({ expense, onCancel, onSave }: EditExpenseFormProps) =>
         sector,
         serviceName,
         overdue,
-        file: fileUrl,
-        fileName: newFileName
+        file: fileBase64,
+        fileName: fileName
       };
 
       console.log('Updating expense data:', expenseData);

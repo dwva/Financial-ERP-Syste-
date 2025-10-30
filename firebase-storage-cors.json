@@ -1,6 +1,6 @@
 [
   {
-    "origin": ["http://localhost:8087", "http://*:8087"],
+    "origin": ["http://localhost:8087"],
     "method": ["GET", "POST", "PUT", "DELETE", "PATCH"],
     "maxAgeSeconds": 3600,
     "responseHeader": ["Content-Type", "Authorization", "X-Requested-With"]

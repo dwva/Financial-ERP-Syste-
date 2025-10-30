@@ -13,7 +13,7 @@ import {
   getDoc,
   onSnapshot // Add this import for real-time listeners
 } from 'firebase/firestore';
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, deleteUser } from 'firebase/auth';
 import { Employee, Expense } from '@/contexts/DataContext';
 
 // Collection references
@@ -56,6 +56,8 @@ let adminCredentials: { email: string; password: string } | null = null;
 // Function to set admin credentials
 export const setAdminCredentials = (email: string, password: string) => {
   adminCredentials = { email, password };
+  // Also store in localStorage for persistence
+  localStorage.setItem('adminCredentials', JSON.stringify({ email, password }));
 };
 
 // Function to re-authenticate as admin
@@ -63,14 +65,33 @@ export const reauthenticateAsAdmin = async () => {
   if (adminCredentials && auth.currentUser?.email !== adminCredentials.email) {
     try {
       await signInWithEmailAndPassword(auth, adminCredentials.email, adminCredentials.password);
+      return true;
     } catch (error) {
       console.error('Error re-authenticating as admin:', error);
+      return false;
     }
   }
+  return true; // Already authenticated as admin
 };
 
 export const createEmployeeUser = async (email: string, password: string, username?: string, mobile?: string) => {
   try {
+    // Store current user credentials before creating new user
+    const currentUser = auth.currentUser;
+    let adminEmail = '';
+    let adminPassword = '';
+    
+    // If current user is admin, store their credentials
+    if (currentUser && (currentUser.email === 'admin@company.com' || currentUser.email === 'adminxyz@gmail.com')) {
+      // Get stored admin credentials
+      const storedCredentials = localStorage.getItem('adminCredentials');
+      if (storedCredentials) {
+        const credentials = JSON.parse(storedCredentials);
+        adminEmail = credentials.email;
+        adminPassword = credentials.password;
+      }
+    }
+    
     // Create user in Firebase Authentication
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     
@@ -95,10 +116,17 @@ export const createEmployeeUser = async (email: string, password: string, userna
     
     await addDoc(employeesCollection, employeeData);
     
-    // Re-authenticate as admin if we were logged in as admin
-    setTimeout(async () => {
-      await reauthenticateAsAdmin();
-    }, 100);
+    // If we were logged in as admin, re-authenticate as admin to prevent redirection
+    if (adminEmail && adminPassword) {
+      // Add a longer delay to ensure the new user is fully created and auth state is stable
+      await new Promise(resolve => setTimeout(resolve, 500));
+      try {
+        await signInWithEmailAndPassword(auth, adminEmail, adminPassword);
+      } catch (signInError) {
+        console.warn('Failed to re-authenticate as admin:', signInError);
+        // Even if re-authentication fails, we continue as the admin should remain logged in
+      }
+    }
     
     return userCredential.user;
   } catch (error) {
@@ -159,8 +187,34 @@ export const updateEmployee = async (id: string, employee: Partial<Employee>) =>
 
 export const deleteEmployee = async (id: string) => {
   try {
+    // First, get the employee document to retrieve the email
     const employeeDoc = doc(db, 'employees', id);
+    const employeeSnapshot = await getDoc(employeeDoc);
+    
+    if (!employeeSnapshot.exists()) {
+      throw new Error('Employee not found');
+    }
+    
+    const employeeData = employeeSnapshot.data();
+    const employeeEmail = employeeData.email;
+    
+    // Delete the employee document from Firestore
     await deleteDoc(employeeDoc);
+    
+    // Also delete the user from Firebase Authentication
+    // Note: This requires the admin to be logged in with sufficient privileges
+    // In a production environment, you might want to use Firebase Admin SDK for this operation
+    try {
+      // Find the user by email and delete them
+      // This is a simplified approach - in production, you would use Firebase Admin SDK
+      console.log(`User with email ${employeeEmail} should be deleted from Firebase Authentication`);
+      // For now, we'll just log this as a reminder
+      // The actual deletion from Firebase Authentication would require Admin SDK
+    } catch (authError) {
+      console.warn('Could not delete user from Firebase Authentication:', authError);
+      // Don't throw this error as it shouldn't prevent the Firestore deletion
+    }
+    
     return id;
   } catch (error) {
     console.error('Error deleting employee:', error);

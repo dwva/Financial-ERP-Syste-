@@ -25,7 +25,7 @@ import {
   AlertDialogHeader, 
   AlertDialogTitle 
 } from '@/components/ui/alert-dialog';
-import { Receipt, FileText, Image as ImageIcon, Search, ArrowUpDown, Filter, Trash2, PlusCircle, Edit, Eye, ChevronDown, ChevronRight } from 'lucide-react';
+import { Receipt, FileText, Image as ImageIcon, Search, ArrowUpDown, Filter, Trash2, PlusCircle, Edit, Eye, ChevronDown, ChevronRight, Upload, Download } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
@@ -42,6 +42,8 @@ interface ExpenseForm {
   serviceName: string;
   overdue: boolean;
   overdueDays: string;
+  file?: File | null;
+  fileName?: string;
 }
 
 type SortField = 'employee' | 'amount' | 'date' | 'description';
@@ -362,30 +364,26 @@ const AllExpensesTableEnhanced = () => {
   };
 
   const handleAddExpense = async () => {
-    // Prevent duplicate submissions
-    if (isSubmitting) {
-      return;
-    }
-    
-    // Validate required fields
-    if (!newExpense.userId || !newExpense.amount || !newExpense.description || !newExpense.date) {
+    // Prevent multiple submissions
+    if (isSubmitting || !newExpense.userId || !newExpense.amount || !newExpense.date || 
+        !newExpense.company || !newExpense.clientName || !newExpense.candidateName || 
+        !newExpense.sector || !newExpense.description || !newExpense.serviceName) {
+      if (isSubmitting) {
+        console.log('Submission already in progress, ignoring duplicate submit');
+        return;
+      }
+      
       toast.error('Please fill in all required fields');
       return;
     }
     
-    // Validate amount is a positive number
-    const amount = parseFloat(newExpense.amount);
-    if (isNaN(amount) || amount <= 0) {
-      toast.error('Please enter a valid positive amount');
-      return;
-    }
-    
+    // Set submitting state
     setIsSubmitting(true);
     
     try {
       // Calculate if expense is overdue based on overdue days
-      let isOverdue = newExpense.overdue;
-      if (newExpense.overdueDays && !isNaN(parseInt(newExpense.overdueDays))) {
+      let isOverdue = false;
+      if (newExpense.overdueDays && !isNaN(parseInt(newExpense.overdueDays)) && newExpense.date) {
         const dueDate = new Date(newExpense.date);
         dueDate.setDate(dueDate.getDate() + parseInt(newExpense.overdueDays));
         isOverdue = dueDate < new Date();
@@ -405,7 +403,7 @@ const AllExpensesTableEnhanced = () => {
         overdueDays: newExpense.overdueDays // Add this line to save overdueDays
       };
 
-      await addExpense(expenseData);
+      await addExpense(expenseData, newExpense.file || undefined);
       
       toast.success('Expense added successfully!');
       setIsAddExpenseDialogOpen(false);
@@ -508,10 +506,6 @@ const AllExpensesTableEnhanced = () => {
             <CardDescription>Manage and view all expense records</CardDescription>
           </div>
           <div className="flex gap-2">
-            <Button onClick={refreshData} size="sm" variant="outline">
-              <ArrowUpDown className="w-4 h-4 mr-2" />
-              Refresh
-            </Button>
             <Button onClick={() => setIsAddExpenseDialogOpen(true)} size="sm">
               <PlusCircle className="w-4 h-4 mr-2" />
               Add Expense
@@ -713,12 +707,58 @@ const AllExpensesTableEnhanced = () => {
                             <TableCell className="py-2 text-sm">{expense.candidateName || 'N/A'}</TableCell>
                             <TableCell className="py-2 text-sm">{expense.sector || 'N/A'}</TableCell>
                             <TableCell className="py-2">
-                              <div className="flex items-center gap-1">
-                                {getFileIcon(expense.fileName)}
-                                <span className="text-xs text-muted-foreground truncate max-w-[80px]">
-                                  {expense.fileName || 'No file'}
-                                </span>
-                              </div>
+                              {expense.fileName ? (
+                                <div className="flex items-center gap-1">
+                                  {getFileIcon(expense.fileName)}
+                                  <span className="text-xs text-muted-foreground truncate max-w-[80px]">
+                                    {expense.fileName}
+                                  </span>
+                                  <div className="flex gap-1">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => {
+                                        // Open file in new tab for viewing
+                                        window.open(expense.file, '_blank');
+                                      }}
+                                      className="h-5 w-5 p-0"
+                                    >
+                                      <Eye className="w-2.5 h-2.5" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={async () => {
+                                        // Download file using fetch API to force download
+                                        try {
+                                          const response = await fetch(expense.file);
+                                          if (!response.ok) {
+                                            throw new Error(`Failed to fetch file: ${response.status} ${response.statusText}`);
+                                          }
+                                          const blob = await response.blob();
+                                          const url = window.URL.createObjectURL(blob);
+                                          const link = document.createElement('a');
+                                          link.href = url;
+                                          link.download = expense.fileName || 'file'
+                                          ;
+                                          document.body.appendChild(link);
+                                          link.click();
+                                          document.body.removeChild(link);
+                                          window.URL.revokeObjectURL(url);
+                                        } catch (error) {
+                                          console.error('Error downloading file:', error);
+                                          toast.error('Failed to download file');
+                                        }
+                                      }}
+                                      className="h-5 w-5 p-0"
+                                    >
+                                      <Download className="w-2.5 h-2.5" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">No file</span>
+                              )}
                             </TableCell>
                             <TableCell className="text-muted-foreground py-2 text-xs">
                               {new Date(expense.timestamp).toLocaleDateString()}
@@ -984,36 +1024,55 @@ const AllExpensesTableEnhanced = () => {
               </div>
             </div>
             
-            <div className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                id="overdue"
-                checked={newExpense.overdue}
-                onChange={(e) => setNewExpense({...newExpense, overdue: e.target.checked})}
-                className="h-4 w-4"
+            <div className="space-y-2">
+              <label htmlFor="overdueDays" className="text-sm font-medium">Payment Due Days</label>
+              <Input
+                id="overdueDays"
+                type="number"
+                placeholder="Enter number of days for payment due"
+                value={newExpense.overdueDays}
+                onChange={(e) => setNewExpense({...newExpense, overdueDays: e.target.value})}
+                className="h-10"
+                min="0"
               />
-              <label htmlFor="overdue" className="text-sm font-medium">Mark as Overdue</label>
+              <p className="text-xs text-muted-foreground">Enter the number of days after the expense date when payment is due</p>
             </div>
             
-            {newExpense.overdue && (
-              <div className="space-y-2">
-                <label htmlFor="overdueDays" className="text-sm font-medium">Overdue Days</label>
+            {/* File Upload */}
+            <div className="space-y-2">
+              <label htmlFor="file" className="text-sm font-medium">Receipt/Document</label>
+              <div className="relative">
                 <Input
-                  id="overdueDays"
-                  type="number"
-                  placeholder="Enter number of days overdue"
-                  value={newExpense.overdueDays}
-                  onChange={(e) => setNewExpense({...newExpense, overdueDays: e.target.value})}
+                  id="file"
+                  type="file"
+                  accept="image/*,.pdf"
+                  onChange={(e) => {
+                    const selectedFile = e.target.files?.[0];
+                    if (selectedFile) {
+                      // Store the file in state
+                      setNewExpense(prev => ({...prev, file: selectedFile, fileName: selectedFile.name}));
+                    } else {
+                      // Clear file if none selected
+                      setNewExpense(prev => ({...prev, file: null, fileName: undefined}));
+                    }
+                  }}
                   className="h-10"
                 />
+                <Upload className="absolute right-3 top-3 h-4 w-4 text-muted-foreground pointer-events-none" />
               </div>
-            )}
+              {newExpense.fileName && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <FileText className="h-4 w-4" />
+                  <span>{newExpense.fileName}</span>
+                </div>
+              )}
+            </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAddExpenseDialogOpen(false)} disabled={isSubmitting} type="button">
+            <Button variant="outline" onClick={() => setIsAddExpenseDialogOpen(false)} disabled={isSubmitting}>
               Cancel
             </Button>
-            <Button onClick={handleAddExpense} disabled={isSubmitting} type="button">
+            <Button onClick={handleAddExpense} disabled={isSubmitting}>
               {isSubmitting ? (
                 <>
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
@@ -1048,7 +1107,7 @@ const AllExpensesTableEnhanced = () => {
                   <p className="font-medium">{formatAmount(selectedExpense.amount)}</p>
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-muted-foreground">Date</label>
+                  <label className="text-sm font-medium text-muted-foreground">Expense Date</label>
                   <p className="font-medium">{new Date(selectedExpense.timestamp).toLocaleDateString()}</p>
                 </div>
                 <div>
@@ -1061,6 +1120,19 @@ const AllExpensesTableEnhanced = () => {
                     )}
                   </p>
                 </div>
+                {selectedExpense.overdueDays && (
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Due Date</label>
+                    <p className="font-medium">
+                      {(() => {
+                        const expenseDate = new Date(selectedExpense.timestamp);
+                        const dueDate = new Date(expenseDate);
+                        dueDate.setDate(expenseDate.getDate() + parseInt(selectedExpense.overdueDays));
+                        return dueDate.toLocaleDateString();
+                      })()}
+                    </p>
+                  </div>
+                )}
               </div>
               
               <div>
@@ -1101,7 +1173,48 @@ const AllExpensesTableEnhanced = () => {
               
               {selectedExpense.fileName && (
                 <div>
-                  <label className="text-sm font-medium text-muted-foreground">Attached File</label>
+                  <div className="flex items-center gap-2 mb-1">
+                    <label className="text-sm font-medium text-muted-foreground">Attached File</label>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        // Open file in new tab for viewing
+                        window.open(selectedExpense.file, '_blank');
+                      }}
+                      className="h-6 px-2 text-xs"
+                    >
+                      View
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={async () => {
+                        // Download file using fetch API to force download
+                        try {
+                          const response = await fetch(selectedExpense.file);
+                          if (!response.ok) {
+                            throw new Error(`Failed to fetch file: ${response.status} ${response.statusText}`);
+                          }
+                          const blob = await response.blob();
+                          const url = window.URL.createObjectURL(blob);
+                          const link = document.createElement('a');
+                          link.href = url;
+                          link.download = selectedExpense.fileName || 'file';
+                          document.body.appendChild(link);
+                          link.click();
+                          document.body.removeChild(link);
+                          window.URL.revokeObjectURL(url);
+                        } catch (error) {
+                          console.error('Error downloading file:', error);
+                          toast.error('Failed to download file');
+                        }
+                      }}
+                      className="h-6 px-2 text-xs"
+                    >
+                      Download
+                    </Button>
+                  </div>
                   <div className="flex items-center gap-2 mt-1">
                     {getFileIcon(selectedExpense.fileName)}
                     <span className="text-sm">{selectedExpense.fileName}</span>

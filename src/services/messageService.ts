@@ -18,7 +18,7 @@ import {
   uploadBytes, 
   getDownloadURL 
 } from 'firebase/storage';
-import { saveMessageFile } from '@/services/messageFileService'; // Import local storage service
+import { saveMessageFile, saveExpenseFile } from '@/services/messageFileService'; // Import local storage service
 
 // Collection references
 const messagesCollection = collection(db, 'messages');
@@ -61,7 +61,7 @@ export const sendMessage = async (message: Omit<Message, 'id' | 'timestamp'>) =>
 export const uploadFile = async (file: File, fileName: string) => {
   try {
     console.log('Uploading file:', { fileName, fileSize: file.size, fileType: file.type });
-    const localFileResult = await saveMessageFile(file);
+    const localFileResult = await saveExpenseFile(file);
     console.log('File saved:', localFileResult);
     return localFileResult.url;
   } catch (error: any) {

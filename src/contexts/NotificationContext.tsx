@@ -19,6 +19,7 @@ interface NotificationContextType {
   markAsRead: (id: string) => void;
   markAllAsRead: () => void;
   addNotification: (notification: Omit<Notification, 'id' | 'timestamp' | 'read'>) => void;
+  deleteNotification: (id: string) => void;
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
@@ -211,6 +212,16 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
   };
 
+  const deleteNotification = (id: string) => {
+    try {
+      setNotifications(prev =>
+        prev.filter(notification => notification.id !== id)
+      );
+    } catch (e) {
+      console.error('Error deleting notification:', e);
+    }
+  };
+
   return (
     <NotificationContext.Provider
       value={{
@@ -218,7 +229,8 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         unreadCount: unreadCount || 0,
         markAsRead,
         markAllAsRead,
-        addNotification
+        addNotification,
+        deleteNotification
       }}
     >
       {children}

@@ -147,7 +147,7 @@ interface DataContextType {
   error: string | null;
   addEmployee: (email: string, password: string, username?: string, mobile?: string) => Promise<void>;
   deleteEmployee: (id: string) => Promise<void>;
-  addExpense: (expense: Omit<Expense, 'id' | 'timestamp'>) => Promise<void>;
+  addExpense: (expense: Omit<Expense, 'id' | 'timestamp'>, file?: File) => Promise<void>;
   updateEmployee: (updatedEmployee: Employee) => Promise<void>;
   updateEmployeeStatus: (id: string, status: 'employee' | 'admin') => Promise<void>;
   updateExpense: (id: string, expense: Partial<Expense>) => Promise<void>;
@@ -314,12 +314,26 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const addExpense = async (expense: Omit<Expense, 'id' | 'timestamp'>) => {
+  const addExpense = async (expense: Omit<Expense, 'id' | 'timestamp'>, file?: File) => {
     try {
-      const newExpense = {
+      // Create the base expense data with timestamp
+      const newExpense: any = {
         ...expense,
         timestamp: new Date().toISOString(), // Use full ISO string instead of just date part
       };
+      
+      // If a file is provided, upload it and add the file info to the expense
+      if (file) {
+        try {
+          const fileUrl = await uploadFile(file, file.name);
+          newExpense.file = fileUrl;
+          newExpense.fileName = file.name;
+        } catch (fileError: any) {
+          console.error('Error uploading file:', fileError);
+          throw new Error(`File upload failed: ${fileError.message || 'Unknown error'}. The expense was not added.`);
+        }
+      }
+      
       const createdExpense = await createExpense(newExpense);
       // Don't add to local state immediately since the real-time listener will update it
       return createdExpense;
@@ -361,8 +375,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         createdAt: new Date().toISOString(),
       };
       const createdInvoice = await createInvoiceService(newInvoice);
-      // Don't add to local state immediately since the real-time listener will update it
-      return createdInvoice;
+      setInvoices(prev => [...prev, createdInvoice as Invoice]);
     } catch (err) {
       console.error('Error adding invoice:', err);
       setError('Failed to add invoice');
@@ -377,8 +390,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         createdAt: new Date().toISOString(),
       };
       const createdInvoice = await createInvoiceHistoryService(newInvoice);
-      // Don't add to local state immediately since the real-time listener will update it
-      return createdInvoice;
+      setInvoiceHistory(prev => [...prev, createdInvoice as Invoice]);
     } catch (err) {
       console.error('Error adding invoice history:', err);
       setError('Failed to add invoice history');

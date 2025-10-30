@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'react-toastify';
-import { Download, FileText, Search, History } from 'lucide-react';
+import { Download, FileText, Search, History, Edit } from 'lucide-react';
 import { useData } from '@/contexts/DataContext';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -46,19 +46,9 @@ const InvoiceGeneration = ({ onNavigateToHistory }: InvoiceGenerationProps) => {
     businessGST: 'GSTIN: 27AABCCDDEEFFG'
   });
   const [isEditingBusinessInfo, setIsEditingBusinessInfo] = useState(false);
-  const [editedBusinessInfo, setEditedBusinessInfo] = useState({
-    businessName: 'Financial ERP System',
-    businessTagline: 'Business Solutions',
-    businessAddress: '123 Corporate Avenue',
-    businessCity: 'Mumbai, Maharashtra 400001',
-    businessCountry: 'India',
-    businessEmail: 'info@financiaerpsys.com',
-    businessPhone: '+91 98765 43210',
-    businessGST: 'GSTIN: 27AABCCDDEEFFG'
-  });
   const [invoiceItems, setInvoiceItems] = useState<InvoiceItem[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [invoiceNumber, setInvoiceNumber] = useState(`INV-${new Date().getFullYear()}${(new Date().getMonth() + 1).toString().padStart(2, '0')}${new Date().getDate().toString().padStart(2, '0')}-${Date.now().toString().slice(-4)}`);
+  const [invoiceNumber, setInvoiceNumber] = useState(`INV-${Date.now().toString().slice(-6)}`);
   const invoiceRef = useRef<HTMLDivElement>(null);
 
   // Filter service charges based on search term and sort alphabetically
@@ -133,7 +123,6 @@ const InvoiceGeneration = ({ onNavigateToHistory }: InvoiceGenerationProps) => {
   };
 
   const formatAmount = (amount: number) => {
-    // Display full numbers instead of abbreviations
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
       currency: 'INR',
@@ -167,8 +156,7 @@ const InvoiceGeneration = ({ onNavigateToHistory }: InvoiceGenerationProps) => {
         scale: 2, // Higher quality
         useCORS: true,
         logging: false,
-        backgroundColor: '#ffffff',
-        allowTaint: true
+        backgroundColor: '#ffffff'
       });
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF('p', 'mm', 'a4');
@@ -257,139 +245,124 @@ const InvoiceGeneration = ({ onNavigateToHistory }: InvoiceGenerationProps) => {
         <div className="grid grid-cols-1 gap-6">
           {/* Business Information Section - Static */}
           <div className="border rounded-lg p-4 bg-muted">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">Business Information</h3>
-              <div className="flex gap-2">
-                {isEditingBusinessInfo && (
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Business Information (Static)</h3>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setIsEditingBusinessInfo(!isEditingBusinessInfo)}
+              >
+                {isEditingBusinessInfo ? 'Cancel' : 'Edit'}
+              </Button>
+            </div>
+            {isEditingBusinessInfo ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Business Name</Label>
+                  <Input 
+                    value={invoiceData.businessName}
+                    onChange={(e) => handleInputChange('businessName', e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Tagline</Label>
+                  <Input 
+                    value={invoiceData.businessTagline}
+                    onChange={(e) => handleInputChange('businessTagline', e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Address</Label>
+                  <Input 
+                    value={invoiceData.businessAddress}
+                    onChange={(e) => handleInputChange('businessAddress', e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>City, State & ZIP</Label>
+                  <Input 
+                    value={invoiceData.businessCity}
+                    onChange={(e) => handleInputChange('businessCity', e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Country</Label>
+                  <Input 
+                    value={invoiceData.businessCountry}
+                    onChange={(e) => handleInputChange('businessCountry', e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Email</Label>
+                  <Input 
+                    value={invoiceData.businessEmail}
+                    onChange={(e) => handleInputChange('businessEmail', e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Phone</Label>
+                  <Input 
+                    value={invoiceData.businessPhone}
+                    onChange={(e) => handleInputChange('businessPhone', e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>GST Number</Label>
+                  <Input 
+                    value={invoiceData.businessGST}
+                    onChange={(e) => handleInputChange('businessGST', e.target.value)}
+                  />
+                </div>
+                <div className="col-span-2 flex justify-end gap-2">
                   <Button 
                     variant="outline" 
-                    size="sm"
-                    onClick={() => {
-                      // Cancel editing
-                      setIsEditingBusinessInfo(false);
-                    }}
+                    onClick={() => setIsEditingBusinessInfo(false)}
                   >
                     Cancel
                   </Button>
-                )}
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => {
-                    if (isEditingBusinessInfo) {
-                      // Save changes
-                      setInvoiceData({ ...invoiceData, ...editedBusinessInfo });
-                      setIsEditingBusinessInfo(false);
-                    } else {
-                      // Start editing
-                      setEditedBusinessInfo({
-                        businessName: invoiceData.businessName,
-                        businessTagline: invoiceData.businessTagline,
-                        businessAddress: invoiceData.businessAddress,
-                        businessCity: invoiceData.businessCity,
-                        businessCountry: invoiceData.businessCountry,
-                        businessEmail: invoiceData.businessEmail,
-                        businessPhone: invoiceData.businessPhone,
-                        businessGST: invoiceData.businessGST
-                      });
-                      setIsEditingBusinessInfo(true);
-                    }
-                  }}
-                >
-                  {isEditingBusinessInfo ? 'Save' : 'Edit'}
-                </Button>
+                  <Button 
+                    onClick={() => setIsEditingBusinessInfo(false)}
+                  >
+                    Save
+                  </Button>
+                </div>
               </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Business Name</Label>
-                {isEditingBusinessInfo ? (
-                  <Input
-                    value={editedBusinessInfo.businessName}
-                    onChange={(e) => setEditedBusinessInfo({ ...editedBusinessInfo, businessName: e.target.value })}
-                  />
-                ) : (
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Business Name</Label>
                   <div className="p-2 bg-white rounded border">{invoiceData.businessName}</div>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label>Tagline</Label>
-                {isEditingBusinessInfo ? (
-                  <Input
-                    value={editedBusinessInfo.businessTagline}
-                    onChange={(e) => setEditedBusinessInfo({ ...editedBusinessInfo, businessTagline: e.target.value })}
-                  />
-                ) : (
+                </div>
+                <div className="space-y-2">
+                  <Label>Tagline</Label>
                   <div className="p-2 bg-white rounded border">{invoiceData.businessTagline}</div>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label>Address</Label>
-                {isEditingBusinessInfo ? (
-                  <Input
-                    value={editedBusinessInfo.businessAddress}
-                    onChange={(e) => setEditedBusinessInfo({ ...editedBusinessInfo, businessAddress: e.target.value })}
-                  />
-                ) : (
+                </div>
+                <div className="space-y-2">
+                  <Label>Address</Label>
                   <div className="p-2 bg-white rounded border">{invoiceData.businessAddress}</div>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label>City, State & ZIP</Label>
-                {isEditingBusinessInfo ? (
-                  <Input
-                    value={editedBusinessInfo.businessCity}
-                    onChange={(e) => setEditedBusinessInfo({ ...editedBusinessInfo, businessCity: e.target.value })}
-                  />
-                ) : (
+                </div>
+                <div className="space-y-2">
+                  <Label>City, State & ZIP</Label>
                   <div className="p-2 bg-white rounded border">{invoiceData.businessCity}</div>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label>Country</Label>
-                {isEditingBusinessInfo ? (
-                  <Input
-                    value={editedBusinessInfo.businessCountry}
-                    onChange={(e) => setEditedBusinessInfo({ ...editedBusinessInfo, businessCountry: e.target.value })}
-                  />
-                ) : (
+                </div>
+                <div className="space-y-2">
+                  <Label>Country</Label>
                   <div className="p-2 bg-white rounded border">{invoiceData.businessCountry}</div>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label>Email</Label>
-                {isEditingBusinessInfo ? (
-                  <Input
-                    value={editedBusinessInfo.businessEmail}
-                    onChange={(e) => setEditedBusinessInfo({ ...editedBusinessInfo, businessEmail: e.target.value })}
-                  />
-                ) : (
+                </div>
+                <div className="space-y-2">
+                  <Label>Email</Label>
                   <div className="p-2 bg-white rounded border">{invoiceData.businessEmail}</div>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label>Phone</Label>
-                {isEditingBusinessInfo ? (
-                  <Input
-                    value={editedBusinessInfo.businessPhone}
-                    onChange={(e) => setEditedBusinessInfo({ ...editedBusinessInfo, businessPhone: e.target.value })}
-                  />
-                ) : (
+                </div>
+                <div className="space-y-2">
+                  <Label>Phone</Label>
                   <div className="p-2 bg-white rounded border">{invoiceData.businessPhone}</div>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label>GST Number</Label>
-                {isEditingBusinessInfo ? (
-                  <Input
-                    value={editedBusinessInfo.businessGST}
-                    onChange={(e) => setEditedBusinessInfo({ ...editedBusinessInfo, businessGST: e.target.value })}
-                  />
-                ) : (
+                </div>
+                <div className="space-y-2">
+                  <Label>GST Number</Label>
                   <div className="p-2 bg-white rounded border">{invoiceData.businessGST}</div>
-                )}
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Invoice Form */}
@@ -502,20 +475,13 @@ const InvoiceGeneration = ({ onNavigateToHistory }: InvoiceGenerationProps) => {
                             className="px-4 py-2 hover:bg-muted cursor-pointer flex justify-between items-center"
                             onClick={() => handleServiceSelect(service.name)}
                           >
-                            <div className="max-w-[70%] truncate" title={service.name}>
+                            <div>
                               <span>{service.name}</span>
                               {service.sector && (
                                 <span className="text-xs text-muted-foreground ml-2">({service.sector})</span>
                               )}
                             </div>
-                            <span className="text-muted-foreground whitespace-nowrap" 
-                                  title={new Intl.NumberFormat('en-IN', {
-                                    style: 'currency',
-                                    currency: 'INR',
-                                    minimumFractionDigits: 2
-                                  }).format(service.amount)}>
-                              {formatAmount(service.amount)}
-                            </span>
+                            <span className="text-muted-foreground">{formatAmount(service.amount)}</span>
                           </div>
                         ))
                       ) : (
@@ -549,24 +515,77 @@ const InvoiceGeneration = ({ onNavigateToHistory }: InvoiceGenerationProps) => {
                       <img 
                         src="/Black SD.png" 
                         alt="Company Logo" 
-                        className="h-24 object-contain max-w-full"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          // Fallback to ensure image loads
-                          console.log('Logo image failed to load');
-                        }}
+                        className="h-24 object-contain"
                       />
                     </div>
-                    <h1 className="text-3xl font-bold text-blue-700">{invoiceData.businessName}</h1>
-                    <p className="text-gray-600 mt-1">{invoiceData.businessTagline}</p>
-                    <div className="mt-4 text-sm text-gray-600">
-                      <p>{invoiceData.businessAddress}</p>
-                      <p>{invoiceData.businessCity}</p>
-                      <p>{invoiceData.businessCountry}</p>
-                      <p className="mt-1">Email: {invoiceData.businessEmail}</p>
-                      <p>Phone: {invoiceData.businessPhone}</p>
-                      <p>{invoiceData.businessGST}</p>
+                    <div className="flex items-center gap-2">
+                      <h1 className="text-3xl font-bold text-blue-700">{invoiceData.businessName}</h1>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => setIsEditingBusinessInfo(!isEditingBusinessInfo)}
+                        className="h-6 w-6 p-0"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </Button>
                     </div>
+                    {isEditingBusinessInfo ? (
+                      <div className="space-y-2 mt-2">
+                        <Input 
+                          value={invoiceData.businessName}
+                          onChange={(e) => handleInputChange('businessName', e.target.value)}
+                          placeholder="Business Name"
+                          className="text-lg font-bold"
+                        />
+                        <Input 
+                          value={invoiceData.businessTagline}
+                          onChange={(e) => handleInputChange('businessTagline', e.target.value)}
+                          placeholder="Business Tagline"
+                        />
+                        <Input 
+                          value={invoiceData.businessAddress}
+                          onChange={(e) => handleInputChange('businessAddress', e.target.value)}
+                          placeholder="Business Address"
+                        />
+                        <Input 
+                          value={invoiceData.businessCity}
+                          onChange={(e) => handleInputChange('businessCity', e.target.value)}
+                          placeholder="City, State ZIP"
+                        />
+                        <Input 
+                          value={invoiceData.businessCountry}
+                          onChange={(e) => handleInputChange('businessCountry', e.target.value)}
+                          placeholder="Country"
+                        />
+                        <Input 
+                          value={invoiceData.businessEmail}
+                          onChange={(e) => handleInputChange('businessEmail', e.target.value)}
+                          placeholder="Email"
+                        />
+                        <Input 
+                          value={invoiceData.businessPhone}
+                          onChange={(e) => handleInputChange('businessPhone', e.target.value)}
+                          placeholder="Phone"
+                        />
+                        <Input 
+                          value={invoiceData.businessGST}
+                          onChange={(e) => handleInputChange('businessGST', e.target.value)}
+                          placeholder="GST Information"
+                        />
+                      </div>
+                    ) : (
+                      <>
+                        <p className="text-gray-600 mt-1">{invoiceData.businessTagline}</p>
+                        <div className="mt-4 text-sm text-gray-600">
+                          <p>{invoiceData.businessAddress}</p>
+                          <p>{invoiceData.businessCity}</p>
+                          <p>{invoiceData.businessCountry}</p>
+                          <p className="mt-1">Email: {invoiceData.businessEmail}</p>
+                          <p>Phone: {invoiceData.businessPhone}</p>
+                          <p>{invoiceData.businessGST}</p>
+                        </div>
+                      </>
+                    )}
                   </div>
                   <div className="text-right">
                     <h2 className="text-3xl font-bold text-gray-800">INVOICE</h2>
@@ -601,48 +620,27 @@ const InvoiceGeneration = ({ onNavigateToHistory }: InvoiceGenerationProps) => {
                 </div>
                 
                 {/* Items Table */}
-                <div className="py-4 overflow-x-auto">
-                  <table className="w-full border-collapse min-w-[600px]">
+                <div className="py-4">
+                  <table className="w-full border-collapse">
                     <thead>
                       <tr className="bg-gray-100">
-                        <th className="border border-gray-300 py-3 px-4 text-left font-semibold text-xs md:text-sm">Description</th>
-                        <th className="border border-gray-300 py-3 px-4 text-left font-semibold text-xs md:text-sm">Sector</th>
-                        <th className="border border-gray-300 py-3 px-4 text-right font-semibold text-xs md:text-sm">Quantity</th>
-                        <th className="border border-gray-300 py-3 px-4 text-right font-semibold text-xs md:text-sm">Unit Price</th>
-                        <th className="border border-gray-300 py-3 px-4 text-right font-semibold text-xs md:text-sm">Amount</th>
+                        <th className="border border-gray-300 py-3 px-4 text-left font-semibold">Description</th>
+                        <th className="border border-gray-300 py-3 px-4 text-left font-semibold">Sector</th>
+                        <th className="border border-gray-300 py-3 px-4 text-right font-semibold">Quantity</th>
+                        <th className="border border-gray-300 py-3 px-4 text-right font-semibold">Unit Price</th>
+                        <th className="border border-gray-300 py-3 px-4 text-right font-semibold">Amount</th>
                       </tr>
                     </thead>
                     <tbody>
                       {invoiceItems.map((item) => (
                         <tr key={item.id}>
-                          <td className="border border-gray-300 py-3 px-4 max-w-[150px] md:max-w-[200px] truncate" title={item.description}>{item.description}</td>
+                          <td className="border border-gray-300 py-3 px-4">{item.description}</td>
                           <td className="border border-gray-300 py-3 px-4">{item.sector || 'N/A'}</td>
                           <td className="border border-gray-300 py-3 px-4 text-right">{item.quantity}</td>
-                          <td className="border border-gray-300 py-3 px-4 text-right whitespace-nowrap" 
-                              title={new Intl.NumberFormat('en-IN', {
-                                style: 'currency',
-                                currency: 'INR',
-                                minimumFractionDigits: 2
-                              }).format(item.amount)}>
-                            {formatAmount(item.amount)}
-                          </td>
-                          <td className="border border-gray-300 py-3 px-4 text-right whitespace-nowrap" 
-                              title={new Intl.NumberFormat('en-IN', {
-                                style: 'currency',
-                                currency: 'INR',
-                                minimumFractionDigits: 2
-                              }).format(calculateItemTotal(item))}>
-                            {formatAmount(calculateItemTotal(item))}
-                          </td>
+                          <td className="border border-gray-300 py-3 px-4 text-right">{formatAmount(item.amount)}</td>
+                          <td className="border border-gray-300 py-3 px-4 text-right">{formatAmount(calculateItemTotal(item))}</td>
                         </tr>
                       ))}
-                      {invoiceItems.length === 0 && (
-                        <tr>
-                          <td colSpan={5} className="border border-gray-300 py-6 px-4 text-center text-gray-500">
-                            No items added to invoice
-                          </td>
-                        </tr>
-                      )}
                     </tbody>
                   </table>
                 </div>
@@ -652,54 +650,22 @@ const InvoiceGeneration = ({ onNavigateToHistory }: InvoiceGenerationProps) => {
                   <table className="w-full border-collapse">
                     <tbody>
                       <tr>
-                        <td className="border border-gray-300 py-2 px-4 text-right text-gray-600 text-xs md:text-sm">Subtotal:</td>
-                        <td className="border border-gray-300 py-2 px-4 text-right font-medium whitespace-nowrap" colSpan={2} 
-                            title={new Intl.NumberFormat('en-IN', {
-                              style: 'currency',
-                              currency: 'INR',
-                              minimumFractionDigits: 2
-                            }).format(calculateSubtotal())}>
-                          {formatAmount(calculateSubtotal())}
-                        </td>
-                        <td></td>
+                        <td className="border border-gray-300 py-2 px-4 text-right text-gray-600">Subtotal:</td>
+                        <td className="border border-gray-300 py-2 px-4 text-right font-medium">{formatAmount(calculateSubtotal())}</td>
                       </tr>
                       {invoiceData.discount > 0 && (
                         <tr>
-                          <td className="border border-gray-300 py-2 px-4 text-right text-gray-600 text-xs md:text-sm">Discount ({invoiceData.discount}%):</td>
-                          <td className="border border-gray-300 py-2 px-4 text-right font-medium whitespace-nowrap" colSpan={2}
-                              title={new Intl.NumberFormat('en-IN', {
-                                style: 'currency',
-                                currency: 'INR',
-                                minimumFractionDigits: 2
-                              }).format(calculateDiscount())}>
-                            -{formatAmount(calculateDiscount())}
-                          </td>
-                          <td></td>
+                          <td className="border border-gray-300 py-2 px-4 text-right text-gray-600">Discount ({invoiceData.discount}%):</td>
+                          <td className="border border-gray-300 py-2 px-4 text-right font-medium">-{formatAmount(calculateDiscount())}</td>
                         </tr>
                       )}
                       <tr>
-                        <td className="border border-gray-300 py-2 px-4 text-right text-gray-600 text-xs md:text-sm">Tax ({invoiceData.taxRate}%):</td>
-                        <td className="border border-gray-300 py-2 px-4 text-right font-medium whitespace-nowrap" colSpan={2}
-                            title={new Intl.NumberFormat('en-IN', {
-                              style: 'currency',
-                              currency: 'INR',
-                              minimumFractionDigits: 2
-                            }).format(calculateTax(calculateSubtotal() - calculateDiscount()))}>
-                          {formatAmount(calculateTax(calculateSubtotal() - calculateDiscount()))}
-                        </td>
-                        <td></td>
+                        <td className="border border-gray-300 py-2 px-4 text-right text-gray-600">Tax ({invoiceData.taxRate}%):</td>
+                        <td className="border border-gray-300 py-2 px-4 text-right font-medium">{formatAmount(calculateTax(calculateSubtotal() - calculateDiscount()))}</td>
                       </tr>
                       <tr className="bg-gray-100 font-bold">
-                        <td className="border border-gray-300 py-3 px-4 text-right text-gray-800 text-sm md:text-base">TOTAL:</td>
-                        <td className="border border-gray-300 py-3 px-4 text-right text-blue-700 whitespace-nowrap" colSpan={2}
-                            title={new Intl.NumberFormat('en-IN', {
-                              style: 'currency',
-                              currency: 'INR',
-                              minimumFractionDigits: 2
-                            }).format(calculateGrandTotal())}>
-                          {formatAmount(calculateGrandTotal())}
-                        </td>
-                        <td></td>
+                        <td className="border border-gray-300 py-3 px-4 text-right text-lg text-gray-800">TOTAL:</td>
+                        <td className="border border-gray-300 py-3 px-4 text-right text-lg text-blue-700">{formatAmount(calculateGrandTotal())}</td>
                       </tr>
                     </tbody>
                   </table>
@@ -721,12 +687,7 @@ const InvoiceGeneration = ({ onNavigateToHistory }: InvoiceGenerationProps) => {
                       <img 
                         src="/signature.png" 
                         alt="Authorized Signature" 
-                        className="h-16 object-contain mt-2 max-w-full"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          // Fallback to ensure image loads
-                          console.log('Signature image failed to load');
-                        }}
+                        className="h-16 object-contain mt-2"
                       />
                     </div>
                     <div className="text-right">
@@ -749,53 +710,53 @@ const InvoiceGeneration = ({ onNavigateToHistory }: InvoiceGenerationProps) => {
         </div>
         
         {/* Invoice Items Table */}
-        <div className="mt-6 border rounded-lg overflow-x-auto">
-          <table className="w-full text-sm min-w-[800px] md:min-w-full">
+        <div className="mt-6 border rounded-lg overflow-hidden">
+          <table className="w-full text-sm">
             <thead className="bg-muted">
               <tr>
-                <th className="text-left p-3 whitespace-nowrap text-xs md:text-sm">Service</th>
-                <th className="text-left p-3 whitespace-nowrap text-xs md:text-sm">Description</th>
-                <th className="text-left p-3 whitespace-nowrap text-xs md:text-sm">Sector</th>
-                <th className="text-right p-3 whitespace-nowrap text-xs md:text-sm">Qty</th>
-                <th className="text-right p-3 whitespace-nowrap text-xs md:text-sm">Unit Price</th>
-                <th className="text-right p-3 whitespace-nowrap text-xs md:text-sm">Amount</th>
-                <th className="text-right p-3 whitespace-nowrap text-xs md:text-sm">Actions</th>
+                <th className="text-left p-3">Service</th>
+                <th className="text-left p-3">Description</th>
+                <th className="text-left p-3">Sector</th>
+                <th className="text-right p-3">Quantity</th>
+                <th className="text-right p-3">Unit Price</th>
+                <th className="text-right p-3">Amount</th>
+                <th className="text-right p-3">Actions</th>
               </tr>
             </thead>
             <tbody>
               {invoiceItems.map((item) => (
-                <tr key={item.id} className="border-b hover:bg-muted/50">
-                  <td className="p-3 whitespace-nowrap max-w-[100px] md:max-w-[150px] truncate" title={item.service}>{item.service}</td>
-                  <td className="p-3 max-w-[150px] md:max-w-[200px]">
+                <tr key={item.id} className="border-b">
+                  <td className="p-3">{item.service}</td>
+                  <td className="p-3">
                     <Input
                       value={item.description}
                       onChange={(e) => handleItemChange(item.id, 'description', e.target.value)}
-                      className="w-full text-xs md:text-sm"
+                      className="w-full"
                     />
                   </td>
-                  <td className="p-3 max-w-[100px] md:max-w-[150px]">
+                  <td className="p-3">
                     <Select 
                       value={item.sector || ''} 
                       onValueChange={(value) => handleItemChange(item.id, 'sector', value)}
                     >
-                      <SelectTrigger className="w-full text-xs md:text-sm">
+                      <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select sector" />
                       </SelectTrigger>
                       <SelectContent>
                         {sectorOptions.map((option, index) => (
-                          <SelectItem key={index} value={option} className="text-xs md:text-sm">
+                          <SelectItem key={index} value={option}>
                             {option}
                           </SelectItem>
                         ))}
                         {sectorOptions.length === 0 && (
-                          <SelectItem value="" className="text-xs md:text-sm">No sectors available</SelectItem>
+                          <SelectItem value="">No sectors available</SelectItem>
                         )}
                       </SelectContent>
                     </Select>
                     <Input
                       value={item.sector || ''}
                       onChange={(e) => handleItemChange(item.id, 'sector', e.target.value)}
-                      className="w-full mt-2 text-xs md:text-sm"
+                      className="w-full mt-2"
                       placeholder="Sector"
                     />
                   </td>
@@ -804,96 +765,56 @@ const InvoiceGeneration = ({ onNavigateToHistory }: InvoiceGenerationProps) => {
                       type="number"
                       value={item.quantity}
                       onChange={(e) => handleItemChange(item.id, 'quantity', parseInt(e.target.value) || 0)}
-                      className="w-full text-right text-xs md:text-sm"
-                      min="0"
+                      className="w-full text-right"
                     />
                   </td>
                   <td className="p-3">
                     <Input
                       type="number"
-                      step="0.01"
                       value={item.amount}
                       onChange={(e) => handleItemChange(item.id, 'amount', parseFloat(e.target.value) || 0)}
-                      className="w-full text-right text-xs md:text-sm"
-                      min="0"
+                      className="w-full text-right"
                     />
                   </td>
-                  <td className="p-3 text-right font-medium whitespace-nowrap" 
-                      title={new Intl.NumberFormat('en-IN', {
-                        style: 'currency',
-                        currency: 'INR',
-                        minimumFractionDigits: 2
-                      }).format(calculateItemTotal(item))}>
-                    {formatAmount(calculateItemTotal(item))}
-                  </td>
+                  <td className="p-3 text-right">{formatAmount(calculateItemTotal(item))}</td>
                   <td className="p-3 text-right">
                     <Button 
                       size="sm" 
                       variant="destructive" 
                       onClick={() => handleRemoveItem(item.id)}
-                      className="text-xs md:text-sm h-8 px-2"
                     >
-                      <span className="hidden md:inline">Remove</span>
-                      <span className="md:hidden">X</span>
+                      Remove
                     </Button>
                   </td>
                 </tr>
               ))}
               {invoiceItems.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="p-6 text-center text-muted-foreground text-sm md:text-base">
+                  <td colSpan={7} className="p-6 text-center text-muted-foreground">
                     No items added to invoice
                   </td>
                 </tr>
               )}
               <tr className="bg-muted font-semibold">
-                <td colSpan={4} className="p-3 text-right text-sm md:text-base">Subtotal:</td>
-                <td className="p-3 text-right font-medium text-sm md:text-base" colSpan={2} 
-                    title={new Intl.NumberFormat('en-IN', {
-                      style: 'currency',
-                      currency: 'INR',
-                      minimumFractionDigits: 2
-                    }).format(calculateSubtotal())}>
-                  {formatAmount(calculateSubtotal())}
-                </td>
+                <td colSpan={4} className="p-3 text-right">Subtotal:</td>
+                <td className="p-3 text-right">{formatAmount(calculateSubtotal())}</td>
                 <td></td>
               </tr>
               {invoiceData.discount > 0 && (
                 <tr className="bg-muted font-semibold">
-                  <td colSpan={4} className="p-3 text-right text-sm md:text-base">Discount ({invoiceData.discount}%):</td>
-                  <td className="p-3 text-right font-medium text-sm md:text-base" colSpan={2}
-                      title={new Intl.NumberFormat('en-IN', {
-                        style: 'currency',
-                        currency: 'INR',
-                        minimumFractionDigits: 2
-                      }).format(calculateDiscount())}>
-                    -{formatAmount(calculateDiscount())}
-                  </td>
+                  <td colSpan={4} className="p-3 text-right">Discount ({invoiceData.discount}%):</td>
+                  <td className="p-3 text-right">-{formatAmount(calculateDiscount())}</td>
                   <td></td>
                 </tr>
               )}
               <tr className="bg-muted font-semibold">
-                <td colSpan={4} className="p-3 text-right text-sm md:text-base">Tax ({invoiceData.taxRate}%):</td>
-                <td className="p-3 text-right font-medium text-sm md:text-base" colSpan={2}
-                    title={new Intl.NumberFormat('en-IN', {
-                      style: 'currency',
-                      currency: 'INR',
-                      minimumFractionDigits: 2
-                    }).format(calculateTax(calculateSubtotal() - calculateDiscount()))}>
-                  {formatAmount(calculateTax(calculateSubtotal() - calculateDiscount()))}
-                </td>
+                <td colSpan={4} className="p-3 text-right">Tax ({invoiceData.taxRate}%):</td>
+                <td className="p-3 text-right">{formatAmount(calculateTax(calculateSubtotal() - calculateDiscount()))}</td>
                 <td></td>
               </tr>
-              <tr className="bg-muted font-bold">
-                <td colSpan={4} className="p-3 text-right text-base md:text-lg">Total:</td>
-                <td className="p-3 text-right font-bold text-base md:text-lg" colSpan={2}
-                    title={new Intl.NumberFormat('en-IN', {
-                      style: 'currency',
-                      currency: 'INR',
-                      minimumFractionDigits: 2
-                    }).format(calculateGrandTotal())}>
-                  {formatAmount(calculateGrandTotal())}
-                </td>
+              <tr className="bg-muted font-bold text-lg">
+                <td colSpan={4} className="p-3 text-right">Total:</td>
+                <td className="p-3 text-right">{formatAmount(calculateGrandTotal())}</td>
                 <td></td>
               </tr>
             </tbody>

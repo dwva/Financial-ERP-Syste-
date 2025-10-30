@@ -19,6 +19,7 @@ const MessagesPage = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState<boolean>(false);
   const [messageToDelete, setMessageToDelete] = useState<{ id: string; subject: string } | null>(null);
   const [userMessages, setUserMessages] = useState<Message[]>([]);
+  const [selectedMessages, setSelectedMessages] = useState<string[]>([]);
 
   // Filter messages for the current user
   useEffect(() => {
@@ -79,32 +80,32 @@ const MessagesPage = () => {
   const unreadCount = userMessages.filter(msg => !msg.read).length;
 
   // Function to download a file
-  const handleDownloadFile = (fileUrl: string, fileName: string) => {
-    try {
-      // Check if this is a local file URL
-      if (fileUrl.startsWith('/message-attachments/')) {
-        // For local files, create the full URL with hostname
-        const fullUrl = `${window.location.protocol}//${window.location.hostname}:3002${fileUrl}`;
+  const handleDownloadFile = async (fileUrl: string, fileName: string) => {
+    // Check if this is a local file URL
+    if (fileUrl.startsWith('localfile://')) {
+      // Extract file ID from the URL
+      const fileId = fileUrl.split('://')[1].split('/')[0];
+      await downloadLocalFile(fileId, fileName);
+    } else {
+      // For Firebase URLs, use fetch API to force download
+      try {
+        const response = await fetch(fileUrl);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch file: ${response.status} ${response.statusText}`);
+        }
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = fullUrl;
+        a.href = url;
         a.download = fileName;
-        a.target = '_blank';
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
-      } else {
-        // For other URLs, create a temporary link
-        const a = document.createElement('a');
-        a.href = fileUrl;
-        a.download = fileName;
-        a.target = '_blank';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+      } catch (error) {
+        console.error('Error downloading file:', error);
+        toast.error('Failed to download file');
       }
-    } catch (error) {
-      console.error('Error downloading file:', error);
-      toast.error('Failed to download file. Please try again.');
     }
   };
 
@@ -194,7 +195,23 @@ const MessagesPage = () => {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Status</TableHead>
+                  <TableHead>
+                    <div className="flex items-center space-x-2">
+                      <input 
+                        type="checkbox" 
+                        checked={selectedMessages.length === userMessages.length && userMessages.length > 0}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedMessages(userMessages.map(msg => msg.id!));
+                          } else {
+                            setSelectedMessages([]);
+                          }
+                        }}
+                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span>Select All</span>
+                    </div>
+                  </TableHead>
                   <TableHead>From</TableHead>
                   <TableHead>Subject</TableHead>
                   <TableHead>Date & Time</TableHead>
@@ -209,11 +226,18 @@ const MessagesPage = () => {
                     className={!message.read ? 'bg-blue-50' : ''}
                   >
                     <TableCell>
-                      {message.read ? (
-                        <MailOpen className="w-4 h-4 text-gray-500" />
-                      ) : (
-                        <Mail className="w-4 h-4 text-blue-500" />
-                      )}
+                      <input 
+                        type="checkbox" 
+                        checked={selectedMessages.includes(message.id!)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedMessages([...selectedMessages, message.id!]);
+                          } else {
+                            setSelectedMessages(selectedMessages.filter(id => id !== message.id));
+                          }
+                        }}
+                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
                     </TableCell>
                     <TableCell className="font-medium">
                       {message.senderName}
@@ -236,7 +260,6 @@ const MessagesPage = () => {
                               size="sm"
                               onClick={() => handleDownloadFile(message.fileUrl!, message.fileName!)}
                               className="ml-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50"
-                              title="Download file"
                             >
                               <Download className="w-4 h-4" />
                             </Button>

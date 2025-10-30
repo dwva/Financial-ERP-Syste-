@@ -233,20 +233,32 @@ const MessageUser = () => {
   };
 
   // Function to download a file
-  const handleDownloadFile = (fileUrl: string, fileName: string) => {
+  const handleDownloadFile = async (fileUrl: string, fileName: string) => {
     // Check if this is a local file URL
     if (fileUrl.startsWith('localfile://')) {
       // Extract file ID from the URL
       const fileId = fileUrl.split('://')[1].split('/')[0];
-      downloadLocalFile(fileId, fileName);
+      await downloadLocalFile(fileId, fileName);
     } else {
-      // For Firebase URLs, create a temporary link
-      const a = document.createElement('a');
-      a.href = fileUrl;
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      // For Firebase URLs, use fetch API to force download
+      try {
+        const response = await fetch(fileUrl);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch file: ${response.status} ${response.statusText}`);
+        }
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+      } catch (error) {
+        console.error('Error downloading file:', error);
+        toast.error('Failed to download file');
+      }
     }
   };
 

@@ -9,10 +9,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 
 const NotificationPage = () => {
   try {
-    const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotification();
+    const { notifications, unreadCount, markAsRead, markAllAsRead, deleteNotification } = useNotification();
     const [filter, setFilter] = useState<'all' | 'unread' | 'read'>('all');
     const [selectedDate, setSelectedDate] = useState<string>('__all_dates__');
     const [selectedMonth, setSelectedMonth] = useState<string>('__all_months__');
+    const [selectedNotifications, setSelectedNotifications] = useState<string[]>([]);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     // Get unique months from notifications
     const uniqueMonths = [...new Set(notifications.map(notification => {
@@ -143,11 +145,51 @@ const NotificationPage = () => {
                   <CheckCircle className="w-4 h-4 mr-2" />
                   Mark All Read
                 </Button>
+                {selectedNotifications.length > 0 && (
+                  <Button 
+                    variant="destructive" 
+                    onClick={async () => {
+                      setIsDeleting(true);
+                      try {
+                        // Delete selected notifications
+                        for (const id of selectedNotifications) {
+                          await deleteNotification(id);
+                        }
+                        // Clear selection
+                        setSelectedNotifications([]);
+                      } catch (error) {
+                        console.error('Error deleting notifications:', error);
+                      } finally {
+                        setIsDeleting(false);
+                      }
+                    }}
+                    disabled={isDeleting}
+                  >
+                    {isDeleting ? 'Deleting...' : `Delete (${selectedNotifications.length})`}
+                  </Button>
+                )}
               </div>
             </div>
             
             {/* Filter Section */}
             <div className="flex flex-wrap gap-4 p-4 bg-muted/50 rounded-lg">
+              {/* Select All Checkbox */}
+              <div className="flex items-center space-x-2">
+                <input 
+                  type="checkbox" 
+                  checked={selectedNotifications.length === filteredNotifications.length && filteredNotifications.length > 0}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setSelectedNotifications(filteredNotifications.map(notification => notification.id));
+                    } else {
+                      setSelectedNotifications([]);
+                    }
+                  }}
+                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <span className="text-sm">Select All</span>
+              </div>
+              
               {/* Read/Unread Filter */}
               <div className="flex gap-2">
                 <Button
@@ -248,6 +290,18 @@ const NotificationPage = () => {
                     }`}
                   >
                     <div className="flex items-start gap-3">
+                      <input 
+                        type="checkbox" 
+                        checked={selectedNotifications.includes(notification.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedNotifications([...selectedNotifications, notification.id]);
+                          } else {
+                            setSelectedNotifications(selectedNotifications.filter(id => id !== notification.id));
+                          }
+                        }}
+                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 mt-1"
+                      />
                       <div className={`p-2 rounded-full ${getNotificationColor(notification.type)}`}>
                         {getNotificationIcon(notification.type)}
                       </div>

@@ -3,7 +3,7 @@ module.exports = {
     {
       name: 'financial-erp-frontend',
       script: 'node_modules/vite/bin/vite.js',
-      args: 'preview --port 8087 --host 0.0.0.0',
+      args: 'preview --port 8087 --host',
       cwd: './',
       instances: 1,
       autorestart: true,
@@ -17,7 +17,6 @@ module.exports = {
       name: 'financial-erp-file-server',
       script: 'server/index.js',
       cwd: './',
-      args: '--host 0.0.0.0',
       instances: 1,
       autorestart: true,
       watch: false,

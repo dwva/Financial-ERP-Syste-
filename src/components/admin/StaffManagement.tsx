@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'react-toastify';
 import { UserPlus, Trash2, Users, User, Building, Hash, Filter, Search, Briefcase } from 'lucide-react';
+import { reauthenticateAsAdmin } from '@/services/firebaseService';
 
 const StaffManagement = () => {
   const { employees, addEmployee, deleteEmployee, updateEmployeeStatus, refreshData } = useData();
@@ -77,30 +78,44 @@ const StaffManagement = () => {
       setIsAddingEmployee(true);
       try {
         // First create the user in Firebase Authentication and Firestore
-        await addEmployee(newEmail, newPassword, newName, newSector, newAge ? parseInt(newAge) : undefined);
+        await addEmployee(newEmail, newPassword, newName, newSector);
         
-        // Refresh data to get the newly created employee
-        await refreshData();
+        // Close the dialog immediately to prevent any UI flickering
+        setIsDialogOpen(false);
         
-        // Find the newly created employee and update their status
-        setTimeout(async () => {
-          const updatedEmployees = employees;
-          const newEmployee = updatedEmployees.find(emp => emp.email === newEmail);
-          if (newEmployee) {
-            await updateEmployeeStatus(newEmployee.id, newStatus);
-            toast.success('Employee added successfully!');
-            // Refresh data again to show the updated status
-            await refreshData();
-          }
-        }, 1000);
+        // Show success message
+        toast.success('Employee added successfully! Employee can now log in with the provided credentials.');
         
+        // Reset form
         setNewName('');
         setNewEmail('');
         setNewPassword('');
         setNewSector('');
         setNewAge('');
         setNewStatus('employee');
-        setIsDialogOpen(false);
+        
+        // Ensure we're still authenticated as admin after user creation
+        setTimeout(async () => {
+          const isAdmin = await reauthenticateAsAdmin();
+          if (isAdmin) {
+            // Refresh data to show the new employee
+            await refreshData();
+            
+            // Find the newly created employee and update their status
+            setTimeout(async () => {
+              await refreshData(); // Refresh again to get the latest data
+              const currentEmployees = [...employees]; // Create a copy to avoid reference issues
+              const newEmployee = currentEmployees.find(emp => emp.email === newEmail);
+              if (newEmployee) {
+                // Convert status to either 'employee' or 'admin' for the updateEmployeeStatus function
+                const statusToUpdate = newStatus === 'founder' || newStatus === 'manager' ? 'admin' : 'employee';
+                await updateEmployeeStatus(newEmployee.id, statusToUpdate);
+                // Refresh data again to show the updated status
+                await refreshData();
+              }
+            }, 1000);
+          }
+        }, 1000);
       } catch (error: any) {
         console.error('Error adding employee:', error);
         let errorMessage = 'Failed to add employee. Please try again.';

@@ -41,6 +41,16 @@ const getFileMetadataList = (): FileMetadata[] => {
 
 // Save file to the message attachments directory (for production, this uses the backend API)
 export const saveMessageFile = async (file: File): Promise<{ url: string; fileName: string; fileId: string }> => {
+  return saveFile(file, 'admin');
+};
+
+// Save file to the expense attachments directory
+export const saveExpenseFile = async (file: File): Promise<{ url: string; fileName: string; fileId: string }> => {
+  return saveFile(file, 'user');
+};
+
+// Generic file saving function
+const saveFile = async (file: File, type: 'admin' | 'user'): Promise<{ url: string; fileName: string; fileId: string }> => {
   try {
     // Generate a unique ID for the file
     const fileId = uuidv4();
@@ -65,8 +75,8 @@ export const saveMessageFile = async (file: File): Promise<{ url: string; fileNa
     const formData = new FormData();
     formData.append('file', file);
     
-    // Use the file server URL (port 3002)
-    const uploadUrl = `${window.location.protocol}//${window.location.hostname}:3002/upload`;
+    // Use the appropriate file server URL (port 3002) based on file type
+    const uploadUrl = type === 'admin' ? 'http://localhost:3002/admin-upload' : 'http://localhost:3002/upload';
     console.log('Uploading file to:', uploadUrl);
     
     // Add timeout and retry logic
@@ -103,9 +113,13 @@ export const saveMessageFile = async (file: File): Promise<{ url: string; fileNa
     // Store metadata
     await storeFileMetadata(metadata);
     
-    // Return file information
+    // Return file information with correct path based on file type
+    const url = type === 'admin' 
+      ? result.file.url.replace('/message-attachments/', '/admin-attachments/')
+      : result.file.url;
+      
     return {
-      url: result.file.url,
+      url,
       fileName: file.name,
       fileId
     };
@@ -113,7 +127,7 @@ export const saveMessageFile = async (file: File): Promise<{ url: string; fileNa
     console.error('Error saving message file:', error);
     // More specific error handling
     if (error instanceof TypeError && error.message.includes('fetch')) {
-      throw new Error('Failed to connect to file upload server. Please ensure the server is running on port 3002 and accessible from your network.');
+      throw new Error('Failed to connect to file upload server. Please ensure the server is running on port 3002.');
     }
     throw new Error(`Failed to save message file: ${error.message || error.toString()}`);
   }
@@ -186,7 +200,7 @@ export const clearAllFileMetadata = (): void => {
 };
 
 // Download a file
-export const downloadLocalFile = (fileId: string, fileName: string): void => {
+export const downloadLocalFile = async (fileId: string, fileName?: string): Promise<void> => {
   try {
     // Get the file metadata to find the file path
     const metadataList = getFileMetadataList();
@@ -196,24 +210,38 @@ export const downloadLocalFile = (fileId: string, fileName: string): void => {
       throw new Error('File not found');
     }
     
+    // Use the original filename from metadata if fileName parameter is not provided
+    const downloadFileName = fileName || fileMetadata.originalName;
+    
+    // Use fetch to get the file and force download
+    // Check if this is an admin attachment (stored in /admin-attachments/) or user attachment (stored in /message-attachments/)
+    const basePath = fileMetadata.path.includes('/admin-attachments/') ? '/admin-attachments/' : '/message-attachments/';
+    const response = await fetch(`http://localhost:3002${fileMetadata.path}`);
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch file: ${response.status} ${response.statusText}`);
+    }
+    
+    const blob = await response.blob();
+    
     // Create a temporary link to download the file
     const a = document.createElement('a');
-    // Use the full URL including the hostname for external access
-    const fileUrl = `${window.location.protocol}//${window.location.hostname}:3002${fileMetadata.path}`;
-    a.href = fileUrl;
-    a.download = fileName;
-    a.target = '_blank';
+    const url = window.URL.createObjectURL(blob);
+    a.href = url;
+    a.download = downloadFileName;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
   } catch (error) {
     console.error('Error downloading file:', error);
-    throw new Error('Failed to download file');
+    throw new Error(`Failed to download file: ${error.message || 'Unknown error'}`);
   }
 };
 
 export default {
   saveMessageFile,
+  saveExpenseFile,
   getFileMetadata,
   getAllFileMetadata,
   deleteFileMetadata,

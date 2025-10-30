@@ -92,14 +92,14 @@ server {
 
     # File upload API
     location /upload {
-        proxy_pass http://localhost:3002;
+        proxy_pass http://localhost:3001;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
     }
 
     # File delete API
     location /file {
-        proxy_pass http://localhost:3002;
+        proxy_pass http://localhost:3001;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
     }

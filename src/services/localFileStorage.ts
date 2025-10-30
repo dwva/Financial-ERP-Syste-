@@ -75,12 +75,25 @@ export const createDownloadUrl = (fileRef: LocalFileReference): string => {
 };
 
 // Download a local file
-export const downloadLocalFile = (fileId: string, fileName: string): void => {
+export const downloadLocalFile = (fileId: string, fileName?: string): void => {
   try {
     const content = sessionStorage.getItem(`localFile_${fileId}`);
     if (!content) {
       console.error('File content not found for download');
       return;
+    }
+    
+    // Try to get the original filename from metadata if available
+    let downloadFileName = fileName;
+    try {
+      const metadataList = JSON.parse(localStorage.getItem('messageFileMetadata') || '[]');
+      const fileMetadata = metadataList.find((meta: any) => meta.id === fileId);
+      if (fileMetadata && fileMetadata.originalName) {
+        downloadFileName = fileMetadata.originalName;
+      }
+    } catch (metadataError) {
+      // If metadata retrieval fails, use the provided fileName
+      console.warn('Could not retrieve file metadata:', metadataError);
     }
     
     // Convert base64 to blob
@@ -97,7 +110,7 @@ export const downloadLocalFile = (fileId: string, fileName: string): void => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = fileName;
+    a.download = downloadFileName || 'download';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
