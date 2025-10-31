@@ -170,3 +170,31 @@ For high-traffic applications:
 2. Implement load balancing for the frontend application
 3. Use a database for file metadata instead of localStorage
 4. Implement caching for frequently accessed files
+
+## Deploying to Firebase
+
+To deploy the application to Firebase:
+
+1. Install Firebase CLI:
+   ```bash
+   npm install -g firebase-tools
+   ```
+
+2. Login to Firebase:
+   ```bash
+   firebase login
+   ```
+
+3. Deploy the application and rules:
+   ```bash
+   firebase deploy
+   ```
+
+   Or deploy specific components:
+   ```bash
+   # Deploy only the application
+   firebase deploy --only hosting
+   
+   # Deploy only the security rules
+   firebase deploy --only firestore:rules,database:rules,storage:rules
+   ```

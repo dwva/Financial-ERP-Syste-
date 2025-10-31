@@ -240,17 +240,6 @@ const AddExpenseForm = () => {
         isOverdue = dueDate < new Date();
       }
       
-      // Convert file to base64 if it exists
-      let fileBase64 = null;
-      if (file) {
-        fileBase64 = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = reject;
-          reader.readAsDataURL(file);
-        });
-      }
-
       // Create expense object with correct properties
       const expenseData = {
         userId: user.email || '',
@@ -264,13 +253,13 @@ const AddExpenseForm = () => {
         serviceName,
         overdue: isOverdue,
         overdueDays: overdueDays, // Add this line to save overdueDays
-        file: fileBase64,
         fileName: file?.name || null,
       };
 
       console.log('Submitting expense data:', expenseData);
       
-      await addExpense(expenseData);
+      // Pass the file separately to addExpense to handle proper file upload
+      await addExpense(expenseData, file);
 
       toast.success('Expense added successfully!');
       setAmount('');

@@ -39,12 +39,12 @@ const getFileMetadataList = (): FileMetadata[] => {
   }
 };
 
-// Save file to the message attachments directory (for production, this uses the backend API)
+// Save file to the message attachments directory (for admin messages to users)
 export const saveMessageFile = async (file: File): Promise<{ url: string; fileName: string; fileId: string }> => {
   return saveFile(file, 'admin');
 };
 
-// Save file to the expense attachments directory
+// Save file to the expense attachments directory (for user expenses or admin-created expenses for users)
 export const saveExpenseFile = async (file: File): Promise<{ url: string; fileName: string; fileId: string }> => {
   return saveFile(file, 'user');
 };
@@ -75,8 +75,18 @@ const saveFile = async (file: File, type: 'admin' | 'user'): Promise<{ url: stri
     const formData = new FormData();
     formData.append('file', file);
     
+    // Log FormData contents for debugging
+    console.log('FormData contents:');
+    for (let [key, value] of formData.entries()) {
+      console.log(key, value);
+    }
+    
     // Use the appropriate file server URL (port 3002) based on file type
-    const uploadUrl = type === 'admin' ? 'http://localhost:3002/admin-upload' : 'http://localhost:3002/upload';
+    // Message files (admin messages to users) should use /admin-upload endpoint
+    // Expense files (user expenses or admin-created expenses for users) should use /upload endpoint
+    const uploadUrl = type === 'admin' 
+      ? 'http://localhost:3002/admin-upload' 
+      : 'http://localhost:3002/upload';
     console.log('Uploading file to:', uploadUrl);
     
     // Add timeout and retry logic
@@ -89,6 +99,7 @@ const saveFile = async (file: File, type: 'admin' | 'user'): Promise<{ url: stri
     }, 10000); // 10 second timeout
     
     console.log('Upload response status:', response.status);
+    console.log('Upload response headers:', response.headers);
     
     if (!response.ok) {
       const errorText = await response.text();
@@ -113,13 +124,9 @@ const saveFile = async (file: File, type: 'admin' | 'user'): Promise<{ url: stri
     // Store metadata
     await storeFileMetadata(metadata);
     
-    // Return file information with correct path based on file type
-    const url = type === 'admin' 
-      ? result.file.url.replace('/message-attachments/', '/admin-attachments/')
-      : result.file.url;
-      
+    // Return file information
     return {
-      url,
+      url: result.file.url,
       fileName: file.name,
       fileId
     };
@@ -214,8 +221,7 @@ export const downloadLocalFile = async (fileId: string, fileName?: string): Prom
     const downloadFileName = fileName || fileMetadata.originalName;
     
     // Use fetch to get the file and force download
-    // Check if this is an admin attachment (stored in /admin-attachments/) or user attachment (stored in /message-attachments/)
-    const basePath = fileMetadata.path.includes('/admin-attachments/') ? '/admin-attachments/' : '/message-attachments/';
+    // The path in metadata should be correct based on where the file was stored
     const response = await fetch(`http://localhost:3002${fileMetadata.path}`);
     
     if (!response.ok) {

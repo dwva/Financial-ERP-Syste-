@@ -21,7 +21,8 @@
     "start": "node server/index.js",
     "prod": "pm2 start ecosystem.config.cjs",
     "prod:stop": "pm2 stop ecosystem.config.cjs",
-    "prod:restart": "pm2 restart ecosystem.config.cjs"
+    "prod:restart": "pm2 restart ecosystem.config.cjs",
+    "deploy-firebase-rules": "tsx scripts/deployFirebaseRules.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

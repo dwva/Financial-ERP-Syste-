@@ -110,6 +110,23 @@ service cloud.firestore {
 
 For production, you should implement more specific rules based on user roles and data access patterns.
 
+Alternatively, you can deploy the rules files included in this project:
+
+1. Install Firebase CLI:
+   ```bash
+   npm install -g firebase-tools
+   ```
+
+2. Login to Firebase:
+   ```bash
+   firebase login
+   ```
+
+3. Deploy the rules:
+   ```bash
+   firebase deploy --only firestore:rules,database:rules,storage:rules
+   ```
+
 ## Authentication
 
 The application uses Firebase Authentication with email/password sign-in method. The default admin user is:

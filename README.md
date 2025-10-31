@@ -45,6 +45,10 @@ The system comes with pre-configured users for testing:
 - **Admin**: admin@company.com / admin123
 - **Regular User**: user@company.com / user123
 
+## Firebase Security Rules Fix
+
+If you're seeing a warning about Firebase Realtime Database security rules, please refer to [FIREBASE_FIX_SUMMARY.md](FIREBASE_FIX_SUMMARY.md) for instructions on how to resolve this issue.
+
 ## File Attachment System
 
 This application includes a messaging system with file attachment capabilities. Files are handled differently based on the environment:

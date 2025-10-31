@@ -235,6 +235,7 @@ const AllExpensesTableEnhanced = () => {
   }, [expenses]);
 
   const filteredAndSortedExpenses = useMemo(() => {
+    console.log('Expenses data:', expenses);
     let filtered = [...expenses];
 
     // Filter by search term
@@ -257,16 +258,26 @@ const AllExpensesTableEnhanced = () => {
     // Filter by month
     if (filterMonth !== 'all') {
       filtered = filtered.filter((expense) => {
-        const expenseMonth = new Date(expense.timestamp).toLocaleDateString('en-US', { month: 'long' });
-        return expenseMonth === filterMonth;
+        try {
+          const expenseMonth = new Date(expense.timestamp).toLocaleDateString('en-US', { month: 'long' });
+          return expenseMonth === filterMonth;
+        } catch (error) {
+          console.error('Error parsing date for expense:', expense.id, expense.timestamp, error);
+          return false;
+        }
       });
     }
 
     // Filter by year
     if (filterYear !== 'all') {
       filtered = filtered.filter((expense) => {
-        const expenseYear = new Date(expense.timestamp).getFullYear().toString();
-        return expenseYear === filterYear;
+        try {
+          const expenseYear = new Date(expense.timestamp).getFullYear().toString();
+          return expenseYear === filterYear;
+        } catch (error) {
+          console.error('Error parsing date for expense:', expense.id, expense.timestamp, error);
+          return false;
+        }
       });
     }
 
@@ -281,7 +292,12 @@ const AllExpensesTableEnhanced = () => {
           comparison = a.amount - b.amount;
           break;
         case 'date':
-          comparison = new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
+          try {
+            comparison = new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
+          } catch (error) {
+            console.error('Error sorting by date:', error);
+            comparison = 0;
+          }
           break;
         case 'description':
           comparison = a.description.localeCompare(b.description);
@@ -290,6 +306,7 @@ const AllExpensesTableEnhanced = () => {
       return sortOrder === 'asc' ? comparison : -comparison;
     });
 
+    console.log('Filtered and sorted expenses:', filtered);
     return filtered;
   }, [expenses, searchTerm, filterEmployee, filterMonth, filterYear, sortField, sortOrder]);
 
@@ -311,6 +328,8 @@ const AllExpensesTableEnhanced = () => {
     
     // Debug logging to see grouping
     console.log('Grouped expenses by client:', groups);
+    console.log('Total expenses:', filteredAndSortedExpenses.length);
+    console.log('Total groups:', Object.keys(groups).length);
     
     return groups;
   }, [filteredAndSortedExpenses]);
@@ -683,6 +702,7 @@ const AllExpensesTableEnhanced = () => {
                       
                       {/* Client Expenses */}
                       {expandedClients[clientName] && clientExpenses.map((expense) => {
+                        console.log('Rendering expense:', expense);
                         const employee = employees.find(emp => emp.email === expense.userId);
                         return (
                           <TableRow key={expense.id} className="h-12 border-b">
@@ -717,9 +737,31 @@ const AllExpensesTableEnhanced = () => {
                                     <Button
                                       variant="ghost"
                                       size="sm"
-                                      onClick={() => {
-                                        // Open file in new tab for viewing
-                                        window.open(expense.file, '_blank');
+                                      onClick={async () => {
+                                        // Try to open file in new tab for viewing
+                                        try {
+                                          // For expense attachments, they should be accessible via /admin-attachments/ path
+                                          // since they're stored in the "Expences attached file" folder
+                                          const fileUrl = expense.file.replace('/message-attachments/', '/admin-attachments/');
+                                          
+                                          // Fetch the file content
+                                          const response = await fetch(fileUrl);
+                                          if (!response.ok) {
+                                            throw new Error(`Failed to fetch file: ${response.status} ${response.statusText}`);
+                                          }
+                                          
+                                          const blob = await response.blob();
+                                          const blobUrl = URL.createObjectURL(blob);
+                                          
+                                          // Open in new tab
+                                          window.open(blobUrl, '_blank');
+                                          
+                                          // Revoke the blob URL after a delay to free memory
+                                          setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
+                                        } catch (error) {
+                                          console.error('Error opening file in new tab:', error);
+                                          toast.error('Failed to view file in new tab. Please try downloading instead.');
+                                        }
                                       }}
                                       className="h-5 w-5 p-0"
                                     >
@@ -731,7 +773,9 @@ const AllExpensesTableEnhanced = () => {
                                       onClick={async () => {
                                         // Download file using fetch API to force download
                                         try {
-                                          const response = await fetch(expense.file);
+                                          // For expense attachments, they should be accessible via /admin-attachments/ path
+                                          const fileUrl = expense.file.replace('/message-attachments/', '/admin-attachments/');
+                                          const response = await fetch(fileUrl);
                                           if (!response.ok) {
                                             throw new Error(`Failed to fetch file: ${response.status} ${response.statusText}`);
                                           }
@@ -739,8 +783,7 @@ const AllExpensesTableEnhanced = () => {
                                           const url = window.URL.createObjectURL(blob);
                                           const link = document.createElement('a');
                                           link.href = url;
-                                          link.download = expense.fileName || 'file'
-                                          ;
+                                          link.download = expense.fileName || 'file';
                                           document.body.appendChild(link);
                                           link.click();
                                           document.body.removeChild(link);
@@ -1178,9 +1221,30 @@ const AllExpensesTableEnhanced = () => {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => {
-                        // Open file in new tab for viewing
-                        window.open(selectedExpense.file, '_blank');
+                      onClick={async () => {
+                        // Try to open file in new tab for viewing
+                        try {
+                          // For expense attachments, they should be accessible via /admin-attachments/ path
+                          const fileUrl = selectedExpense.file.replace('/message-attachments/', '/admin-attachments/');
+                          
+                          // Fetch the file content
+                          const response = await fetch(fileUrl);
+                          if (!response.ok) {
+                            throw new Error(`Failed to fetch file: ${response.status} ${response.statusText}`);
+                          }
+                          
+                          const blob = await response.blob();
+                          const blobUrl = URL.createObjectURL(blob);
+                          
+                          // Open in new tab
+                          window.open(blobUrl, '_blank');
+                          
+                          // Revoke the blob URL after a delay to free memory
+                          setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
+                        } catch (error) {
+                          console.error('Error opening file in new tab:', error);
+                          toast.error('Failed to view file in new tab. Please try downloading instead.');
+                        }
                       }}
                       className="h-6 px-2 text-xs"
                     >
@@ -1192,7 +1256,9 @@ const AllExpensesTableEnhanced = () => {
                       onClick={async () => {
                         // Download file using fetch API to force download
                         try {
-                          const response = await fetch(selectedExpense.file);
+                          // For expense attachments, they should be accessible via /admin-attachments/ path
+                          const fileUrl = selectedExpense.file.replace('/message-attachments/', '/admin-attachments/');
+                          const response = await fetch(fileUrl);
                           if (!response.ok) {
                             throw new Error(`Failed to fetch file: ${response.status} ${response.statusText}`);
                           }

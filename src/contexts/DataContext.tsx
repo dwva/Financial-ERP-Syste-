@@ -39,7 +39,8 @@ import {
   markMessageAsRead as markMsgRead,
   deleteMessage as deleteMessageService,
   getAllMessages as getAllMessagesService,
-  uploadFile,
+  uploadMessageFile,
+  uploadExpenseFile,
   Message
 } from '@/services/messageService';
 
@@ -195,20 +196,24 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Fetch initial data and set up real-time listeners
   useEffect(() => {
+    console.log('Initializing DataContext');
     refreshData();
     
     // Set up real-time listener for expenses
     const unsubscribeExpenses = onExpensesChange((newExpenses) => {
+      console.log('Expenses updated:', newExpenses.length);
       setExpenses(newExpenses);
     });
     
     // Set up real-time listener for messages
     const unsubscribeMessages = onMessagesChange((newMessages) => {
+      console.log('Messages updated:', newMessages.length);
       setMessages(newMessages);
     });
     
     // Set up real-time listener for dropdown data
     const unsubscribeDropdownData = onDropdownDataChange((newData) => {
+      console.log('Dropdown data updated:', newData.length);
       setDropdownData(newData);
     });
     
@@ -241,6 +246,15 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         getProfitLossReports(),
         getDropdownData() // Add this line
       ]);
+      console.log('Data fetched:', {
+        employees: employeesData.length,
+        expenses: expensesData.length,
+        invoices: invoicesData.length,
+        serviceCharges: serviceChargesData.length,
+        invoiceHistory: invoiceHistoryData.length,
+        profitLossReports: profitLossReportsData.length,
+        dropdownData: dropdownData.length
+      });
       setEmployees(employeesData);
       setExpenses(expensesData);
       setInvoices(invoicesData);
@@ -325,7 +339,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // If a file is provided, upload it and add the file info to the expense
       if (file) {
         try {
-          const fileUrl = await uploadFile(file, file.name);
+          const fileUrl = await uploadExpenseFile(file, file.name);
           newExpense.file = fileUrl;
           newExpense.fileName = file.name;
         } catch (fileError: any) {
@@ -500,7 +514,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // If a file is provided, upload it and add the file info to the message
       if (file) {
         try {
-          const fileUrl = await uploadFile(file, file.name);
+          const fileUrl = await uploadMessageFile(file, file.name);
           messageData.fileUrl = fileUrl;
           messageData.fileName = file.name;
         } catch (fileError: any) {

@@ -87,9 +87,13 @@ const MessagesPage = () => {
       const fileId = fileUrl.split('://')[1].split('/')[0];
       await downloadLocalFile(fileId, fileName);
     } else {
-      // For Firebase URLs, use fetch API to force download
+      // For server URLs, use fetch API to force download
       try {
-        const response = await fetch(fileUrl);
+        // For message attachments, they should be accessible via /message-attachments/ path
+        // since they're stored in the "Message attached files" folder
+        const correctedFileUrl = fileUrl.replace('/admin-attachments/', '/message-attachments/');
+        
+        const response = await fetch(correctedFileUrl);
         if (!response.ok) {
           throw new Error(`Failed to fetch file: ${response.status} ${response.statusText}`);
         }

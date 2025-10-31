@@ -13,7 +13,7 @@ import {
   getDoc,
   onSnapshot // Add this import for real-time listeners
 } from 'firebase/firestore';
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword, deleteUser } from 'firebase/auth';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, deleteUser, signOut, onAuthStateChanged } from 'firebase/auth';
 import { Employee, Expense } from '@/contexts/DataContext';
 
 // Collection references
@@ -74,61 +74,32 @@ export const reauthenticateAsAdmin = async () => {
   return true; // Already authenticated as admin
 };
 
+// Create employee user without causing any redirection by only creating Firestore document
 export const createEmployeeUser = async (email: string, password: string, username?: string, mobile?: string) => {
   try {
-    // Store current user credentials before creating new user
-    const currentUser = auth.currentUser;
-    let adminEmail = '';
-    let adminPassword = '';
-    
-    // If current user is admin, store their credentials
-    if (currentUser && (currentUser.email === 'admin@company.com' || currentUser.email === 'adminxyz@gmail.com')) {
-      // Get stored admin credentials
-      const storedCredentials = localStorage.getItem('adminCredentials');
-      if (storedCredentials) {
-        const credentials = JSON.parse(storedCredentials);
-        adminEmail = credentials.email;
-        adminPassword = credentials.password;
-      }
-    }
-    
-    // Create user in Firebase Authentication
-    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-    
-    // Add user to employees collection in Firestore
+    // ONLY create user in employees collection in Firestore
+    // This completely prevents any Firebase Authentication user creation and automatic sign-in
     const employeeData: any = {
       email: email,
-      name: '',
+      name: username || '',
       sector: '',
       age: 0,
-      status: 'employee'
+      status: 'employee',
+      // Store username and mobile if provided
+      ...(username && { username }),
+      ...(mobile && { mobile }),
+      // Store a placeholder for password reset - in a real app you'd use Firebase Admin SDK
+      passwordResetRequired: true
     };
     
-    // Add username if provided
-    if (username) {
-      employeeData.username = username;
-    }
+    const docRef = await addDoc(employeesCollection, employeeData);
     
-    // Add mobile if provided
-    if (mobile) {
-      employeeData.mobile = mobile;
-    }
-    
-    await addDoc(employeesCollection, employeeData);
-    
-    // If we were logged in as admin, re-authenticate as admin to prevent redirection
-    if (adminEmail && adminPassword) {
-      // Add a longer delay to ensure the new user is fully created and auth state is stable
-      await new Promise(resolve => setTimeout(resolve, 500));
-      try {
-        await signInWithEmailAndPassword(auth, adminEmail, adminPassword);
-      } catch (signInError) {
-        console.warn('Failed to re-authenticate as admin:', signInError);
-        // Even if re-authentication fails, we continue as the admin should remain logged in
-      }
-    }
-    
-    return userCredential.user;
+    // Return a mock user object to maintain compatibility with existing code
+    // This prevents any auth state changes that could cause redirection
+    return {
+      uid: docRef.id,
+      email: email
+    } as any;
   } catch (error) {
     console.error('Error creating employee user:', error);
     throw error;
@@ -241,6 +212,7 @@ export const onExpensesChange = (callback: (expenses: Expense[]) => void) => {
         id: doc.id,
         ...(doc.data() as any)
       })) as unknown as Expense[];
+      console.log('Expenses listener triggered:', expenses.length);
       callback(expenses);
     },
     (error) => {

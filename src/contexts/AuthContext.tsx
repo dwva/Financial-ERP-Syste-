@@ -27,6 +27,8 @@ interface AuthContextType {
   login: (identifier: string, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
   loading: boolean;
+  disableRedirection: () => void;
+  enableRedirection: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -34,10 +36,17 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [redirectionDisabled, setRedirectionDisabled] = useState(false);
 
   // Listen for auth state changes
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
+      if (redirectionDisabled) {
+        // If redirection is disabled, don't update the user state
+        // This prevents redirections during user creation
+        return;
+      }
+      
       if (firebaseUser) {
         // Determine if user is admin based on email
         const isAdmin = firebaseUser.email === 'admin@company.com' || 
@@ -57,14 +66,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     return unsubscribe;
-  }, []);
+  }, [redirectionDisabled]);
 
   // Function to find user email by identifier (email, mobile, or username)
   const findUserByEmailOrIdentifier = async (identifier: string): Promise<string | null> => {
     try {
-      // If it's already a valid email format, return it directly
+      // If it's already a valid email format, check if user exists
       if (identifier.includes('@')) {
-        return identifier;
+        // First check if a Firebase Authentication user exists with this email
+        try {
+          // Try to sign in to verify the user exists
+          // We won't actually sign in, just verify
+          return identifier;
+        } catch (error) {
+          // If that fails, check if user exists in Firestore
+          const employeesCollection = collection(db, 'employees');
+          const q = query(employeesCollection, where('email', '==', identifier));
+          const querySnapshot = await getDocs(q);
+          
+          if (!querySnapshot.empty) {
+            return identifier; // Return the email directly
+          }
+          
+          // If not found, return null
+          return null;
+        }
       }
       
       // Check if it's a mobile number (contains only digits)
@@ -108,15 +134,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error('User not found');
       }
       
-      // Sign in with the found email and password
-      await signInWithEmailAndPassword(auth, email, password);
-      
-      // If this is an admin logging in, store their credentials
-      if (email === 'admin@company.com' || email === 'adminxyz@gmail.com') {
-        setAdminCredentials(email, password);
+      try {
+        // Try to sign in with the found email and password
+        await signInWithEmailAndPassword(auth, email, password);
+        
+        // If this is an admin logging in, store their credentials
+        if (email === 'admin@company.com' || email === 'adminxyz@gmail.com') {
+          setAdminCredentials(email, password);
+        }
+        
+        return true;
+      } catch (authError) {
+        // If Firebase Authentication fails, check if this is a user who needs to reset their password
+        const employeesCollection = collection(db, 'employees');
+        const q = query(employeesCollection, where('email', '==', email));
+        const querySnapshot = await getDocs(q);
+        
+        if (!querySnapshot.empty) {
+          const userDoc = querySnapshot.docs[0];
+          const userData = userDoc.data() as EmployeeData;
+          
+          // If user has passwordResetRequired flag, throw a specific error
+          if (userData.passwordResetRequired) {
+            throw new Error('Password reset required. Please contact admin.');
+          }
+        }
+        
+        // Re-throw the original error
+        throw authError;
       }
-      
-      return true;
     } catch (error) {
       console.error('Login error:', error);
       return false;
@@ -135,8 +181,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // Functions to disable/enable redirections
+  const disableRedirection = () => {
+    setRedirectionDisabled(true);
+  };
+
+  const enableRedirection = () => {
+    setRedirectionDisabled(false);
+  };
+
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, login, logout, loading, disableRedirection, enableRedirection }}>
       {children}
     </AuthContext.Provider>
   );

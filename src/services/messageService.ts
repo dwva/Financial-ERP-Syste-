@@ -57,10 +57,41 @@ export const sendMessage = async (message: Omit<Message, 'id' | 'timestamp'>) =>
   }
 };
 
-// Upload a file and return its download URL
+// Upload a file and return its download URL for messages
+export const uploadMessageFile = async (file: File, fileName: string) => {
+  try {
+    console.log('Uploading message file:', { fileName, fileSize: file.size, fileType: file.type });
+    // Use saveMessageFile for message attachments to store them in the correct location
+    const localFileResult = await saveMessageFile(file);
+    console.log('Message file saved:', localFileResult);
+    return localFileResult.url;
+  } catch (error: any) {
+    console.error('Error uploading message file:', error);
+    throw new Error(`Message file upload failed: ${error.message || 'Unknown error'}`);
+  }
+};
+
+// Upload a file and return its download URL for expenses
+export const uploadExpenseFile = async (file: File, fileName: string) => {
+  try {
+    console.log('Uploading expense file:', { fileName, fileSize: file.size, fileType: file.type });
+    // Use saveExpenseFile for expense attachments to store them in the correct location
+    const localFileResult = await saveExpenseFile(file);
+    console.log('Expense file saved:', localFileResult);
+    return localFileResult.url;
+  } catch (error: any) {
+    console.error('Error uploading expense file:', error);
+    throw new Error(`Expense file upload failed: ${error.message || 'Unknown error'}`);
+  }
+};
+
+// DEPRECATED: This function should no longer be used directly
+// Use uploadMessageFile or uploadExpenseFile instead
 export const uploadFile = async (file: File, fileName: string) => {
   try {
     console.log('Uploading file:', { fileName, fileSize: file.size, fileType: file.type });
+    // Always use saveExpenseFile for expense attachments, regardless of who is adding them
+    // This ensures all expense attachments are stored in the correct location and accessible to admins
     const localFileResult = await saveExpenseFile(file);
     console.log('File saved:', localFileResult);
     return localFileResult.url;
