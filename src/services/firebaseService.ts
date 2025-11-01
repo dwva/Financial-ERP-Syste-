@@ -60,18 +60,11 @@ export const setAdminCredentials = (email: string, password: string) => {
   localStorage.setItem('adminCredentials', JSON.stringify({ email, password }));
 };
 
-// Function to re-authenticate as admin
+// Function to re-authenticate as admin (removed automatic re-authentication)
 export const reauthenticateAsAdmin = async () => {
-  if (adminCredentials && auth.currentUser?.email !== adminCredentials.email) {
-    try {
-      await signInWithEmailAndPassword(auth, adminCredentials.email, adminCredentials.password);
-      return true;
-    } catch (error) {
-      console.error('Error re-authenticating as admin:', error);
-      return false;
-    }
-  }
-  return true; // Already authenticated as admin
+  // Removed automatic re-authentication logic
+  // This function now only returns true to maintain compatibility
+  return true;
 };
 
 // Create employee user without causing any redirection by only creating Firestore document

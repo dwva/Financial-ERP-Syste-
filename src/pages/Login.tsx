@@ -1,19 +1,17 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'react-toastify';
-import { Lock, Mail, Phone, User } from 'lucide-react';
+import { Lock, Mail } from 'lucide-react';
 
 const Login = () => {
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
-  const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,26 +20,27 @@ const Login = () => {
     try {
       const success = await login(identifier, password);
       if (success) {
-        // Check if it's an admin
-        if (identifier === 'admin@company.com' || identifier === 'adminxyz@gmail.com') {
-          navigate('/admin');
-        } else {
-          navigate('/dashboard');
-        }
+        // Show success message
         toast.success('Login successful!');
-      } else {
-        toast.error('Invalid credentials. Please check your identifier and password.');
+        // Clear the form fields
+        setIdentifier('');
+        setPassword('');
+        // Redirection is handled in AuthContext
       }
     } catch (error: any) {
       console.error('Login error:', error);
       let errorMessage = 'Login failed. Please try again.';
       
-      if (error.code === 'auth/user-not-found') {
+      if (error.message === 'User not found') {
         errorMessage = 'No user found with this identifier.';
+      } else if (error.message === 'Password reset required. Please contact admin.') {
+        errorMessage = 'Password reset required. Please contact admin.';
       } else if (error.code === 'auth/wrong-password') {
         errorMessage = 'Incorrect password.';
       } else if (error.code === 'auth/invalid-email') {
         errorMessage = 'Invalid identifier format.';
+      } else if (error.code === 'auth/user-not-found') {
+        errorMessage = 'User not found.';
       }
       
       toast.error(errorMessage);

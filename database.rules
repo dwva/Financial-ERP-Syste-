@@ -1,6 +1,7 @@
 {
   "rules": {
-    // Deny all access to Realtime Database as we're using Firestore
+    // This project uses Firestore, not Realtime Database
+    // This file is kept for compatibility but not used
     ".read": false,
     ".write": false
   }

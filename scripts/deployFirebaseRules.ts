@@ -17,7 +17,7 @@ async function deployFirebaseRules() {
   
   try {
     // Check if Firebase CLI is installed
-    await execPromise('firebase --version');
+    await execPromise('npx firebase-tools --version');
     console.log('Firebase CLI found');
   } catch (error) {
     console.error('Firebase CLI not found. Please install it first:');
@@ -26,16 +26,33 @@ async function deployFirebaseRules() {
   }
   
   try {
-    // Deploy Firestore, Realtime Database, and Storage rules
-    console.log('Deploying Firestore, Realtime Database, and Storage rules...');
-    const { stdout, stderr } = await execPromise('firebase deploy --only firestore:rules,database:rules,storage:rules');
+    // Deploy only Firestore rules (since we're not using Realtime Database)
+    console.log('Deploying Firestore rules...');
+    const { stdout, stderr } = await execPromise('npx firebase-tools deploy --only firestore:rules');
     
     if (stdout) console.log(stdout);
     if (stderr) console.error(stderr);
     
-    console.log('Firebase rules deployed successfully!');
+    console.log('Firestore rules deployed successfully!');
   } catch (error: any) {
-    console.error('Error deploying Firebase rules:', error.message);
+    console.error('Error deploying Firestore rules:', error.message);
+    console.log('Please manually deploy the rules using the Firebase Console:');
+    console.log('1. Go to https://console.firebase.google.com/');
+    console.log('2. Select your project "financial-erp-system"');
+    console.log('3. Go to Firestore Database > Rules');
+    console.log('4. Paste the content of firestore.rules file:');
+    console.log('```');
+    console.log('rules_version = \'2\';');
+    console.log('service cloud.firestore {');
+    console.log('  match /databases/{database}/documents {');
+    console.log('    // Allow authenticated users to read and write all documents');
+    console.log('    match /{document=**} {');
+    console.log('      allow read, write: if request.auth != null;');
+    console.log('    }');
+    console.log('  }');
+    console.log('}');
+    console.log('```');
+    console.log('5. Click "Publish"');
     process.exit(1);
   }
 }
