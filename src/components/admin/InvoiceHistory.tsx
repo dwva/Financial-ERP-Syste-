@@ -4,12 +4,16 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useData } from '@/contexts/DataContext';
-import { Search, Eye, Trash2 } from 'lucide-react';
+import { Search, Eye, Trash2, ArrowLeft } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'react-toastify';
 import AlertDialog from './AlertDialog'; // Added import
 
-const InvoiceHistory = () => {
+interface InvoiceHistoryProps {
+  onBackToGeneration?: () => void;
+}
+
+const InvoiceHistory = ({ onBackToGeneration }: InvoiceHistoryProps) => {
   const { invoiceHistory, deleteInvoiceHistory } = useData();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
@@ -80,8 +84,18 @@ const InvoiceHistory = () => {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Invoice History</CardTitle>
-        <CardDescription>View all generated invoices</CardDescription>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle>Invoice History</CardTitle>
+            <CardDescription>View all generated invoices</CardDescription>
+          </div>
+          {onBackToGeneration && (
+            <Button variant="outline" onClick={onBackToGeneration}>
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Invoice Generation
+            </Button>
+          )}
+        </div>
       </CardHeader>
       <CardContent>
         {/* Search Bar */}

@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'react-toastify';
 import { UserPlus, Trash2, Users, User, Building, Hash, Filter, Search, Phone, Mail, Info, CheckCircle, Camera } from 'lucide-react';
 import { reauthenticateAsAdmin } from '@/services/firebaseService';
@@ -28,6 +29,7 @@ const UserManagement = () => {
   const [isAddingEmployee, setIsAddingEmployee] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [employeeToDelete, setEmployeeToDelete] = useState<{id: string, email: string} | null>(null);
+  const [selectedEmployees, setSelectedEmployees] = useState<string[]>([]);
 
   // Get unique sectors from employees
   const uniqueSectors = useMemo(() => {
@@ -87,25 +89,12 @@ const UserManagement = () => {
           emailToUse = `${newUsername}@company.com`;
         }
         
-        // First create the user in Firebase Authentication and Firestore
-        await addEmployee(emailToUse, newPassword, newUsername || undefined, newMobile || undefined);
+        // Create the user with the appropriate status
+        await addEmployee(emailToUse, newPassword, newUsername || undefined, newMobile || undefined, newUserStatus);
         
-        // If creating an admin, we need to update their status in Firestore
+        // Show success message
         if (newUserStatus === 'admin') {
-          // Refresh data to get the newly created employee
-          await refreshData();
-          
-          // Find the newly created employee and update their status
-          setTimeout(async () => {
-            const updatedEmployees = employees;
-            const newEmployee = updatedEmployees.find(emp => emp.email === emailToUse);
-            if (newEmployee) {
-              await updateEmployeeStatus(newEmployee.id, 'admin');
-              toast.success('Admin user created successfully!');
-              // Refresh data again to show the updated status
-              await refreshData();
-            }
-          }, 1000);
+          toast.success('Admin user created successfully!');
         } else {
           toast.success('Employee added successfully!');
         }
@@ -130,6 +119,8 @@ const UserManagement = () => {
           errorMessage = 'Invalid email format.';
         } else if (error.code === 'auth/weak-password') {
           errorMessage = 'Password should be at least 6 characters.';
+        } else if (error.message && error.message.includes('email-already-in-use')) {
+          errorMessage = 'An account with this email already exists.';
         }
         
         toast.error(errorMessage);
@@ -140,9 +131,9 @@ const UserManagement = () => {
   };
 
   const handleDeleteEmployee = (id: string, email: string) => {
-    if (email === 'admin@company.com' || email === 'user@company.com' || 
-        email === 'adminxyz@gmail.com') {
-      toast.error('Cannot delete admin users');
+    // Allow deletion of sub-admins but prevent deletion of main admins
+    if (email === 'admin@company.com' || email === 'adminxyz@gmail.com') {
+      toast.error('Cannot delete main admin users');
       return;
     }
     setEmployeeToDelete({id, email});
@@ -193,6 +184,57 @@ const UserManagement = () => {
     return emailName.substring(0, 2).toUpperCase();
   };
 
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedEmployees(filteredEmployees.map(emp => emp.id));
+    } else {
+      setSelectedEmployees([]);
+    }
+  };
+
+  const handleSelectEmployee = (employeeId: string, checked: boolean) => {
+    if (checked) {
+      setSelectedEmployees(prev => [...prev, employeeId]);
+    } else {
+      setSelectedEmployees(prev => prev.filter(id => id !== employeeId));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedEmployees.length === 0) return;
+    
+    try {
+      // Filter out main admins from selected employees
+      const employeesToDelete = selectedEmployees.filter(id => {
+        const employee = employees.find(emp => emp.id === id);
+        return employee && 
+               employee.email !== 'admin@company.com' && 
+               employee.email !== 'adminxyz@gmail.com';
+      });
+      
+      const mainAdmins = selectedEmployees.filter(id => {
+        const employee = employees.find(emp => emp.id === id);
+        return employee && 
+               (employee.email === 'admin@company.com' || 
+                employee.email === 'adminxyz@gmail.com');
+      });
+      
+      if (mainAdmins.length > 0) {
+        toast.error('Cannot delete main admin users');
+      }
+      
+      for (const employeeId of employeesToDelete) {
+        await deleteEmployee(employeeId);
+      }
+      
+      toast.success(`${employeesToDelete.length} employee(s) deleted successfully!`);
+      setSelectedEmployees([]);
+    } catch (error) {
+      console.error('Error deleting employees:', error);
+      toast.error('Failed to delete employees. Please try again.');
+    }
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -207,123 +249,131 @@ const UserManagement = () => {
                 <CardDescription>Manage employee accounts</CardDescription>
               </div>
             </div>
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-              <DialogTrigger asChild>
-                <Button className="gap-2">
-                  <UserPlus className="w-4 h-4" />
-                  Add User
+            <div className="flex items-center gap-2">
+              {selectedEmployees.length > 0 && (
+                <Button variant="destructive" size="sm" onClick={handleBulkDelete}>
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete ({selectedEmployees.length})
                 </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-md md:max-w-lg">
-                <DialogHeader>
-                  <DialogTitle>Add New User</DialogTitle>
-                  <DialogDescription>
-                    Enter the user details below. Username will be stored separately and not appended with @company.com
-                  </DialogDescription>
-                </DialogHeader>
-                <form onSubmit={handleAddEmployee} className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="new-username">Username</Label>
-                      <div className="relative">
-                        <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              )}
+              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button className="gap-2">
+                    <UserPlus className="w-4 h-4" />
+                    Add User
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-md md:max-w-lg">
+                  <DialogHeader>
+                    <DialogTitle>Add New User</DialogTitle>
+                    <DialogDescription>
+                      Enter the user details below. Username will be stored separately and not appended with @company.com
+                    </DialogDescription>
+                  </DialogHeader>
+                  <form onSubmit={handleAddEmployee} className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="new-username">Username</Label>
+                        <div className="relative">
+                          <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                          <Input
+                            id="new-username"
+                            type="text"
+                            placeholder="Enter username"
+                            value={newUsername}
+                            onChange={(e) => setNewUsername(e.target.value)}
+                            className="pl-10"
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="new-email">Email Address</Label>
+                        <div className="relative">
+                          <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                          <Input
+                            id="new-email"
+                            type="email"
+                            placeholder="user@company.com"
+                            value={newEmail}
+                            onChange={(e) => setNewEmail(e.target.value)}
+                            className="pl-10"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="new-mobile">Mobile Number</Label>
+                        <div className="relative">
+                          <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                          <Input
+                            id="new-mobile"
+                            type="tel"
+                            placeholder="Enter mobile number"
+                            value={newMobile}
+                            onChange={(e) => setNewMobile(e.target.value)}
+                            className="pl-10"
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="new-password">Password</Label>
                         <Input
-                          id="new-username"
-                          type="text"
-                          placeholder="Enter username"
-                          value={newUsername}
-                          onChange={(e) => setNewUsername(e.target.value)}
-                          className="pl-10"
+                          id="new-password"
+                          type="password"
+                          placeholder="Enter password (min. 6 characters)"
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          required
+                          minLength={6}
                         />
                       </div>
                     </div>
+                    
                     <div className="space-y-2">
-                      <Label htmlFor="new-email">Email Address</Label>
-                      <div className="relative">
-                        <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                        <Input
-                          id="new-email"
-                          type="email"
-                          placeholder="user@company.com"
-                          value={newEmail}
-                          onChange={(e) => setNewEmail(e.target.value)}
-                          className="pl-10"
-                        />
+                      <Label htmlFor="new-status">User Status</Label>
+                      <Select value={newUserStatus} onValueChange={(value: 'employee' | 'admin') => setNewUserStatus(value)}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select user status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="employee">Employee</SelectItem>
+                          <SelectItem value="admin">Admin (Full Access)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div className="bg-green-50 p-3 rounded-md border border-green-200">
+                      <div className="flex items-start gap-2">
+                        <CheckCircle className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                        <div>
+                          <p className="text-sm font-medium text-green-800">No Automatic Redirection</p>
+                          <p className="text-sm text-green-700 mt-1">
+                            After creating a user, you will remain on this page. The new user must log in separately using their credentials.
+                          </p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="new-mobile">Mobile Number</Label>
-                      <div className="relative">
-                        <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                        <Input
-                          id="new-mobile"
-                          type="tel"
-                          placeholder="Enter mobile number"
-                          value={newMobile}
-                          onChange={(e) => setNewMobile(e.target.value)}
-                          className="pl-10"
-                        />
-                      </div>
+                    
+                    <div className="flex flex-col sm:flex-row gap-2 pt-2">
+                      <Button type="submit" className="flex-1" disabled={isAddingEmployee}>
+                        {isAddingEmployee ? 'Adding User...' : 'Add User'}
+                      </Button>
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        onClick={() => setIsDialogOpen(false)} 
+                        disabled={isAddingEmployee}
+                        className="flex-1"
+                      >
+                        Cancel
+                      </Button>
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="new-password">Password</Label>
-                      <Input
-                        id="new-password"
-                        type="password"
-                        placeholder="Enter password (min. 6 characters)"
-                        value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
-                        required
-                        minLength={6}
-                      />
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="new-status">User Status</Label>
-                    <Select value={newUserStatus} onValueChange={(value: 'employee' | 'admin') => setNewUserStatus(value)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select user status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="employee">Employee</SelectItem>
-                        <SelectItem value="admin">Admin</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div className="bg-green-50 p-3 rounded-md border border-green-200">
-                    <div className="flex items-start gap-2">
-                      <CheckCircle className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                      <div>
-                        <p className="text-sm font-medium text-green-800">No Automatic Redirection</p>
-                        <p className="text-sm text-green-700 mt-1">
-                          After creating a user, you will remain on this page. The new user must log in separately using their credentials.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="flex flex-col sm:flex-row gap-2 pt-2">
-                    <Button type="submit" className="flex-1" disabled={isAddingEmployee}>
-                      {isAddingEmployee ? 'Adding User...' : 'Add User'}
-                    </Button>
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      onClick={() => setIsDialogOpen(false)} 
-                      disabled={isAddingEmployee}
-                      className="flex-1"
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                </form>
-              </DialogContent>
-            </Dialog>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            </div>
           </div>
           
           {/* Filter Section */}
@@ -385,6 +435,12 @@ const UserManagement = () => {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-12">
+                    <Checkbox
+                      checked={selectedEmployees.length === filteredEmployees.length && filteredEmployees.length > 0}
+                      onCheckedChange={handleSelectAll}
+                    />
+                  </TableHead>
                   <TableHead className="whitespace-nowrap">Profile</TableHead>
                   <TableHead className="whitespace-nowrap">Employee ID</TableHead>
                   <TableHead className="whitespace-nowrap">Name</TableHead>
@@ -398,60 +454,70 @@ const UserManagement = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredEmployees.map((employee) => (
-                  <TableRow key={employee.id}>
-                    <TableCell className="whitespace-nowrap">
-                      <Avatar className="h-10 w-10">
-                        <AvatarImage src={employee.profilePicture || ''} alt={employee.name || employee.email} />
-                        <AvatarFallback>
-                          {getUserInitials(employee.name, employee.email)}
-                        </AvatarFallback>
-                      </Avatar>
-                    </TableCell>
-                    <TableCell className="font-medium whitespace-nowrap">{employee.id.substring(0, 8)}...</TableCell>
-                    <TableCell className="whitespace-nowrap">
-                      <div className="flex items-center gap-2">
-                        <User className="w-4 h-4 text-muted-foreground" />
-                        {employee.name || 'N/A'}
-                      </div>
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap">{employee.username || 'N/A'}</TableCell>
-                    <TableCell className="whitespace-nowrap">{employee.email}</TableCell>
-                    <TableCell className="whitespace-nowrap">
-                      <div className="flex items-center gap-2">
-                        <Phone className="w-4 h-4 text-muted-foreground" />
-                        {employee.mobile || 'N/A'}
-                      </div>
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap">
-                      <div className="flex items-center gap-2">
-                        <Building className="w-4 h-4 text-muted-foreground" />
-                        {employee.sector || 'N/A'}
-                      </div>
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap">
-                      <div className="flex items-center gap-2">
-                        <Hash className="w-4 h-4 text-muted-foreground" />
-                        {employee.age || 'N/A'}
-                      </div>
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap">{getStatusBadge(employee.status)}</TableCell>
-                    <TableCell className="text-right whitespace-nowrap">
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => handleDeleteEmployee(employee.id, employee.email)}
-                        className="gap-2"
-                        disabled={employee.email === 'admin@company.com' || 
-                                  employee.email === 'user@company.com' || 
+                {filteredEmployees.map((employee) => {
+                  const isSelected = selectedEmployees.includes(employee.id);
+                  return (
+                    <TableRow key={employee.id} className={isSelected ? 'bg-muted' : ''}>
+                      <TableCell>
+                        <Checkbox
+                          checked={isSelected}
+                          onCheckedChange={(checked) => handleSelectEmployee(employee.id, checked as boolean)}
+                          disabled={employee.email === 'admin@company.com' || 
                                   employee.email === 'adminxyz@gmail.com'}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                        <span className="hidden sm:inline">Delete</span>
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                        />
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        <Avatar className="h-10 w-10">
+                          <AvatarImage src={employee.profilePicture || ''} alt={employee.name || employee.email} />
+                          <AvatarFallback>
+                            {getUserInitials(employee.name, employee.email)}
+                          </AvatarFallback>
+                        </Avatar>
+                      </TableCell>
+                      <TableCell className="font-medium whitespace-nowrap">{employee.id.substring(0, 8)}...</TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          <User className="w-4 h-4 text-muted-foreground" />
+                          {employee.name || 'N/A'}
+                        </div>
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">{employee.username || 'N/A'}</TableCell>
+                      <TableCell className="whitespace-nowrap">{employee.email}</TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          <Phone className="w-4 h-4 text-muted-foreground" />
+                          {employee.mobile || 'N/A'}
+                        </div>
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          <Building className="w-4 h-4 text-muted-foreground" />
+                          {employee.sector || 'N/A'}
+                        </div>
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          <Hash className="w-4 h-4 text-muted-foreground" />
+                          {employee.age || 'N/A'}
+                        </div>
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">{getStatusBadge(employee.status)}</TableCell>
+                      <TableCell className="text-right whitespace-nowrap">
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => handleDeleteEmployee(employee.id, employee.email)}
+                          className="gap-2"
+                          disabled={employee.email === 'admin@company.com' || 
+                                    employee.email === 'adminxyz@gmail.com'}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          <span className="hidden sm:inline">Delete</span>
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>

@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { AlertTriangle, FileText, Image as ImageIcon, Trash2 } from 'lucide-react';
 import { toast } from 'react-toastify';
@@ -11,6 +12,7 @@ import { toast } from 'react-toastify';
 const OverdueExpenses = () => {
   const { expenses, employees, deleteExpense } = useData();
   const [overdueExpenses, setOverdueExpenses] = useState<any[]>([]);
+  const [selectedExpenses, setSelectedExpenses] = useState<string[]>([]);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // Filter expenses marked as overdue by user
@@ -55,16 +57,51 @@ const OverdueExpenses = () => {
     return diffDays;
   };
 
+  const handleSelectExpense = (expenseId: string) => {
+    setSelectedExpenses(prev => {
+      if (prev.includes(expenseId)) {
+        return prev.filter(id => id !== expenseId);
+      } else {
+        return [...prev, expenseId];
+      }
+    });
+  };
+
+  const handleSelectAll = () => {
+    if (selectedExpenses.length === overdueExpenses.length) {
+      setSelectedExpenses([]);
+    } else {
+      setSelectedExpenses(overdueExpenses.map(expense => expense.id));
+    }
+  };
+
   const handleDeleteExpense = async (expenseId: string) => {
     try {
       setDeletingId(expenseId);
       await deleteExpense(expenseId);
+      // Remove from selected expenses if it was selected
+      setSelectedExpenses(prev => prev.filter(id => id !== expenseId));
       toast.success('Expense deleted successfully!');
     } catch (error) {
       console.error('Error deleting expense:', error);
       toast.error('Failed to delete expense. Please try again.');
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const handleDeleteSelected = async () => {
+    try {
+      // Delete all selected expenses
+      const deletePromises = selectedExpenses.map(id => deleteExpense(id));
+      await Promise.all(deletePromises);
+      
+      // Clear selection
+      setSelectedExpenses([]);
+      toast.success(`${selectedExpenses.length} expense(s) deleted successfully!`);
+    } catch (error) {
+      console.error('Error deleting expenses:', error);
+      toast.error('Failed to delete some expenses. Please try again.');
     }
   };
 
@@ -82,15 +119,54 @@ const OverdueExpenses = () => {
             </CardDescription>
           </div>
         </div>
-        <p className="text-sm text-muted-foreground mt-2">
-          {overdueExpenses.length} expense{overdueExpenses.length !== 1 ? 's' : ''} marked as overdue
-        </p>
+        <div className="flex items-center justify-between mt-2">
+          <p className="text-sm text-muted-foreground">
+            {overdueExpenses.length} expense{overdueExpenses.length !== 1 ? 's' : ''} marked as overdue
+          </p>
+          {selectedExpenses.length > 0 && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button 
+                  variant="destructive" 
+                  size="sm"
+                  className="flex items-center gap-2"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Delete Selected ({selectedExpenses.length})
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This action cannot be undone. This will permanently delete {selectedExpenses.length} selected expense{selectedExpenses.length !== 1 ? 's' : ''}.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleDeleteSelected}
+                    className="bg-red-500 hover:bg-red-600"
+                  >
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+        </div>
       </CardHeader>
       <CardContent>
         <div className="border rounded-lg overflow-hidden">
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-12">
+                  <Checkbox
+                    checked={selectedExpenses.length === overdueExpenses.length && overdueExpenses.length > 0}
+                    onCheckedChange={handleSelectAll}
+                  />
+                </TableHead>
                 <TableHead>Employee</TableHead>
                 <TableHead>Amount</TableHead>
                 <TableHead>Description</TableHead>
@@ -105,7 +181,7 @@ const OverdueExpenses = () => {
             <TableBody>
               {overdueExpenses.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
                     No overdue expenses found
                   </TableCell>
                 </TableRow>
@@ -113,9 +189,16 @@ const OverdueExpenses = () => {
                 overdueExpenses.map((expense) => {
                   const employee = employees.find(emp => emp.email === expense.userId);
                   const daysOverdue = calculateDaysOverdue(expense.date, expense.overdueDays);
+                  const isSelected = selectedExpenses.includes(expense.id);
                   
                   return (
-                    <TableRow key={expense.id}>
+                    <TableRow key={expense.id} className={isSelected ? 'bg-muted' : ''}>
+                      <TableCell>
+                        <Checkbox
+                          checked={isSelected}
+                          onCheckedChange={() => handleSelectExpense(expense.id)}
+                        />
+                      </TableCell>
                       <TableCell className="font-medium">
                         {employee?.name || expense.userId.split('@')[0]}
                       </TableCell>

@@ -1,17 +1,34 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'react-toastify';
 import { Lock, Mail } from 'lucide-react';
+import PasswordReset from '@/components/PasswordReset';
 
 const Login = () => {
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
+  const [showPasswordReset, setShowPasswordReset] = useState(false);
+  const [userEmail, setUserEmail] = useState('');
+  const { login, user, resetPassword, findUserByEmailOrIdentifier } = useAuth();
+  const navigate = useNavigate();
+
+  // Handle redirection after successful login
+  useEffect(() => {
+    if (user) {
+      // Redirect based on user role
+      if (user.role === 'admin') {
+        navigate('/admin', { replace: true });
+      } else {
+        navigate('/dashboard', { replace: true });
+      }
+    }
+  }, [user, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,27 +42,54 @@ const Login = () => {
         // Clear the form fields
         setIdentifier('');
         setPassword('');
-        // Redirection is handled in AuthContext
+        // Redirection will happen in the useEffect when user state changes
       }
     } catch (error: any) {
       console.error('Login error:', error);
       let errorMessage = 'Login failed. Please try again.';
       
       if (error.message === 'User not found') {
-        errorMessage = 'No user found with this identifier.';
+        errorMessage = 'No user found with this identifier. Please check your email, username, or mobile number.';
       } else if (error.message === 'Password reset required. Please contact admin.') {
-        errorMessage = 'Password reset required. Please contact admin.';
+        // Handle password reset required case
+        const userResult = await findUserByEmailOrIdentifier(identifier);
+        if (userResult && userResult.email) {
+          setUserEmail(userResult.email);
+          setShowPasswordReset(true);
+          return; // Exit early to show password reset modal
+        } else {
+          errorMessage = 'Password reset required. Please contact admin.';
+        }
+      } else if (error.message === 'Invalid credentials. Please check your email and password.') {
+        errorMessage = 'Invalid credentials. Please check your identifier and password.';
       } else if (error.code === 'auth/wrong-password') {
-        errorMessage = 'Incorrect password.';
+        errorMessage = 'Incorrect password. Please try again.';
       } else if (error.code === 'auth/invalid-email') {
-        errorMessage = 'Invalid identifier format.';
+        errorMessage = 'Invalid email format. Try using your username or mobile number instead.';
       } else if (error.code === 'auth/user-not-found') {
-        errorMessage = 'User not found.';
+        errorMessage = 'User not found. Please check your identifier.';
+      } else if (error.code === 'auth/invalid-credential') {
+        errorMessage = 'Invalid credentials. Please check your identifier and password.';
+      } else if (error.code === 'auth/too-many-requests') {
+        errorMessage = 'Too many failed login attempts. Please try again later.';
+      } else if (error.message) {
+        errorMessage = error.message;
       }
       
       toast.error(errorMessage);
     } finally {
       setLoading(false);
+    }
+  };
+  
+  const handlePasswordReset = async (newPassword: string) => {
+    try {
+      await resetPassword(userEmail, newPassword);
+      setShowPasswordReset(false);
+      toast.success('Password reset successful! Please log in with your new password.');
+    } catch (error: any) {
+      console.error('Password reset error:', error);
+      toast.error(error.message || 'Failed to reset password. Please try again.');
     }
   };
 
@@ -62,6 +106,9 @@ const Login = () => {
           <CardDescription className="text-center">
             Sign in to your account
           </CardDescription>
+          <CardDescription className="text-center text-sm text-green-600 font-medium mt-2">
+            You can sign in with your email, mobile number, or username
+          </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">
@@ -74,11 +121,12 @@ const Login = () => {
                 <Input
                   id="identifier"
                   type="text"
-                  placeholder="Email, mobile number, or username"
+                  placeholder="Enter your email, mobile number, or username"
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
                   className="pl-10"
                   required
+                  autoComplete="username"
                 />
               </div>
             </div>
@@ -96,6 +144,7 @@ const Login = () => {
                   onChange={(e) => setPassword(e.target.value)}
                   className="pl-10"
                   required
+                  autoComplete="current-password"
                 />
               </div>
             </div>
@@ -107,6 +156,15 @@ const Login = () => {
           </CardFooter>
         </form>
       </Card>
+      
+      {/* Password Reset Modal */}
+      {showPasswordReset && (
+        <PasswordReset 
+          email={userEmail} 
+          onPasswordReset={handlePasswordReset}
+          onCancel={() => setShowPasswordReset(false)}
+        />
+      )}
     </div>
   );
 };

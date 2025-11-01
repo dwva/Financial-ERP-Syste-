@@ -5,14 +5,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { CheckCircle, Clock, FileText, Image as ImageIcon, ChevronDown, ChevronRight, AlertTriangle } from 'lucide-react';
+import { CheckCircle, Clock, FileText, Image as ImageIcon, ChevronDown, ChevronRight, AlertTriangle, Search } from 'lucide-react';
 import { toast } from 'react-toastify';
 
 const ExpenseStatus = () => {
   const { expenses, employees, updateExpense } = useData();
   const { addNotification } = useNotification();
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [searchTerm, setSearchTerm] = useState<string>('');
   const [expandedClients, setExpandedClients] = useState<Record<string, boolean>>({});
   const [allExpanded, setAllExpanded] = useState<boolean>(false);
 
@@ -89,10 +91,34 @@ const ExpenseStatus = () => {
   };
 
   const filteredExpenses = useMemo(() => {
-    return statusFilter === 'all' 
+    let filtered = statusFilter === 'all' 
       ? expenses 
       : expenses.filter(expense => (expense.status || 'pending') === statusFilter);
-  }, [expenses, statusFilter]);
+      
+    // Apply search filter
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase().trim();
+      filtered = filtered.filter(expense => {
+        // Search in employee name
+        const employee = employees.find(emp => emp.email === expense.userId);
+        const employeeName = employee?.name?.toLowerCase() || '';
+        
+        // Search in client name, company, description
+        const clientName = expense.clientName?.toLowerCase() || '';
+        const company = expense.company?.toLowerCase() || '';
+        const description = expense.description?.toLowerCase() || '';
+        
+        return (
+          employeeName.includes(term) ||
+          clientName.includes(term) ||
+          company.includes(term) ||
+          description.includes(term)
+        );
+      });
+    }
+    
+    return filtered;
+  }, [expenses, employees, statusFilter, searchTerm]);
 
   // Group expenses by client name
   const groupedExpenses = useMemo(() => {
@@ -187,9 +213,18 @@ const ExpenseStatus = () => {
             </div>
           </div>
           
-          {/* Status Filter */}
-          <div className="flex gap-4 items-center">
-            <div className="w-40">
+          {/* Filters */}
+          <div className="flex flex-col md:flex-row gap-4 items-center">
+            <div className="relative w-full md:w-64">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search expenses..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <div className="w-full md:w-40">
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger>
                   <SelectValue placeholder="Filter by status" />
@@ -228,7 +263,7 @@ const ExpenseStatus = () => {
               {Object.keys(groupedExpenses).length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
-                    No expenses found
+                    {searchTerm ? 'No expenses match your search criteria' : 'No expenses found'}
                   </TableCell>
                 </TableRow>
               ) : (

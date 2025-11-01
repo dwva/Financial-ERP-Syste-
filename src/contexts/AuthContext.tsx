@@ -7,7 +7,7 @@ import {
   User as FirebaseUser
 } from 'firebase/auth';
 import { useNavigate } from 'react-router-dom';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { setAdminCredentials } from '@/services/firebaseService';
 
 interface User {
@@ -21,6 +21,7 @@ interface EmployeeData {
   mobile?: string;
   username?: string;
   passwordResetRequired?: boolean;
+  status?: string;
   [key: string]: any;
 }
 
@@ -29,6 +30,8 @@ interface AuthContextType {
   login: (identifier: string, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
   loading: boolean;
+  resetPassword: (email: string, newPassword: string) => Promise<void>;
+  findUserByEmailOrIdentifier: (identifier: string) => Promise<{email: string, passwordResetRequired?: boolean, status?: string, docId?: string} | null>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -36,28 +39,43 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [shouldRedirect, setShouldRedirect] = useState(false);
   const navigate = useNavigate();
 
   // Listen for auth state changes
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
       if (firebaseUser) {
-        // Determine if user is admin based on email
+        // Determine if user is admin based on email or status
         const isAdmin = firebaseUser.email === 'admin@company.com' || 
                        firebaseUser.email === 'adminxyz@gmail.com';
+        
+        // Check if user has admin status in Firestore
+        let hasAdminStatus = isAdmin;
+        if (!isAdmin) {
+          try {
+            const employeesCollection = collection(db, 'employees');
+            const q = query(employeesCollection, where('email', '==', firebaseUser.email));
+            const querySnapshot = await getDocs(q);
+            
+            if (!querySnapshot.empty) {
+              const userDoc = querySnapshot.docs[0];
+              const userData = userDoc.data() as EmployeeData;
+              hasAdminStatus = userData.status === 'admin';
+            }
+          } catch (error) {
+            console.error('Error checking admin status:', error);
+          }
+        }
         
         const userData: User = {
           uid: firebaseUser.uid,
           email: firebaseUser.email,
-          role: isAdmin ? 'admin' : 'user'
+          role: hasAdminStatus ? 'admin' : 'user'
         };
         
         setUser(userData);
-        setShouldRedirect(true);
       } else {
         setUser(null);
-        setShouldRedirect(false);
       }
       setLoading(false);
     });
@@ -65,76 +83,81 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return unsubscribe;
   }, []);
 
-  // Handle redirection after manual login
-  useEffect(() => {
-    if (user && shouldRedirect) {
-      // Automatically redirect to appropriate dashboard
-      if (user.role === 'admin') {
-        navigate('/admin', { replace: true });
-      } else {
-        navigate('/dashboard', { replace: true });
-      }
-      setShouldRedirect(false);
-    }
-  }, [user, shouldRedirect, navigate]);
-
   // Function to find user email by identifier (email, mobile, or username)
-  const findUserByEmailOrIdentifier = async (identifier: string): Promise<{email: string, passwordResetRequired?: boolean} | null> => {
+  const findUserByEmailOrIdentifier = async (identifier: string): Promise<{email: string, passwordResetRequired?: boolean, status?: string, docId?: string} | null> => {
     try {
+      console.log('Finding user by identifier:', identifier);
+      
+      // Check for admin users first (direct match)
+      if (identifier === 'admin@company.com' || identifier === 'adminxyz@gmail.com') {
+        console.log('Admin user found by direct match');
+        return {
+          email: identifier,
+          passwordResetRequired: false,
+          status: 'admin'
+        };
+      }
+      
+      const employeesCollection = collection(db, 'employees');
+      let querySnapshot;
+      
       // If it's already a valid email format
       if (identifier.includes('@')) {
-        // Check if user exists in Firestore
-        const employeesCollection = collection(db, 'employees');
+        // Check if user exists in Firestore by email
         const q = query(employeesCollection, where('email', '==', identifier));
-        const querySnapshot = await getDocs(q);
+        querySnapshot = await getDocs(q);
         
         if (!querySnapshot.empty) {
           const userDoc = querySnapshot.docs[0];
           const userData = userDoc.data() as EmployeeData;
+          console.log('User found by email:', userData.email);
           return {
             email: userData.email,
-            passwordResetRequired: userData.passwordResetRequired
+            passwordResetRequired: userData.passwordResetRequired,
+            status: userData.status,
+            docId: userDoc.id
           };
         }
-        
-        // If not found in Firestore, check if it's an admin user
-        if (identifier === 'admin@company.com' || identifier === 'adminxyz@gmail.com') {
-          return {
-            email: identifier,
-            passwordResetRequired: false
-          };
-        }
-        
-        // If not found, return null
-        return null;
       }
       
       // Check if it's a mobile number (contains only digits)
       const isMobileNumber = /^\d+$/.test(identifier);
       
-      // Query Firestore for the user based on mobile or username
-      const employeesCollection = collection(db, 'employees');
-      let q;
-      
       if (isMobileNumber) {
         // Search by mobile number
-        q = query(employeesCollection, where('mobile', '==', identifier));
-      } else {
-        // Search by username
-        q = query(employeesCollection, where('username', '==', identifier));
+        const q = query(employeesCollection, where('mobile', '==', identifier));
+        querySnapshot = await getDocs(q);
+        
+        if (!querySnapshot.empty) {
+          const userDoc = querySnapshot.docs[0];
+          const userData = userDoc.data() as EmployeeData;
+          console.log('User found by mobile:', userData.email);
+          return {
+            email: userData.email,
+            passwordResetRequired: userData.passwordResetRequired,
+            status: userData.status,
+            docId: userDoc.id
+          };
+        }
       }
       
-      const querySnapshot = await getDocs(q);
+      // Search by username
+      const q = query(employeesCollection, where('username', '==', identifier));
+      querySnapshot = await getDocs(q);
       
       if (!querySnapshot.empty) {
         const userDoc = querySnapshot.docs[0];
         const userData = userDoc.data() as EmployeeData;
+        console.log('User found by username:', userData.email);
         return {
-          email: userData.email,
-          passwordResetRequired: userData.passwordResetRequired
+            email: userData.email,
+            passwordResetRequired: userData.passwordResetRequired,
+            status: userData.status,
+            docId: userDoc.id
         };
       }
       
+      console.log('No user found with identifier:', identifier);
       return null;
     } catch (error) {
       console.error('Error finding user by identifier:', error);
@@ -145,37 +168,82 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (identifier: string, password: string): Promise<boolean> => {
     try {
       setLoading(true);
+      console.log('Attempting login with identifier:', identifier);
       
       // Find the user's email based on the identifier
       const userResult = await findUserByEmailOrIdentifier(identifier);
       
       if (!userResult) {
+        console.error('Login failed: User not found with identifier:', identifier);
         throw new Error('User not found');
       }
       
-      const { email, passwordResetRequired } = userResult;
+      const { email, passwordResetRequired, status } = userResult;
+      console.log('User found, email:', email, 'status:', status);
       
-      // Check if user needs to reset password
-      if (passwordResetRequired) {
-        throw new Error('Password reset required. Please contact admin.');
-      }
+      // Password reset check removed - users can login directly with their password
       
-      try {
-        // Try to sign in with the found email and password
-        await signInWithEmailAndPassword(auth, email, password);
-        
-        // If this is an admin logging in, store their credentials
-        if (email === 'admin@company.com' || email === 'adminxyz@gmail.com') {
+      // For main admins, use Firebase Authentication
+      if (email === 'admin@company.com' || email === 'adminxyz@gmail.com') {
+        try {
+          console.log('Attempting Firebase auth for admin user:', email);
+          // Try to sign in with the found email and password
+          await signInWithEmailAndPassword(auth, email, password);
+          
+          // Store admin credentials
           setAdminCredentials(email, password);
+          console.log('Admin login successful');
+          
+          return true;
+        } catch (authError: any) {
+          console.error('Admin login failed:', authError.code, authError.message);
+          // Re-throw the original error
+          throw authError;
         }
-        
-        // Set flag to trigger redirection
-        setShouldRedirect(true);
-        
-        return true;
-      } catch (authError: any) {
-        // Re-throw the original error
-        throw authError;
+      } 
+      // For sub-admins and regular users
+      else {
+        // First, try Firebase Authentication for all users
+        try {
+          console.log('Attempting Firebase auth for user:', email);
+          await signInWithEmailAndPassword(auth, email, password);
+          console.log('Firebase auth successful for user:', email);
+          return true;
+        } catch (firebaseError: any) {
+          console.error('Firebase auth failed:', firebaseError.code, firebaseError.message);
+          
+          // If Firebase authentication fails, check if it's because the user doesn't exist in Firebase
+          if (firebaseError.code === 'auth/user-not-found' || 
+              firebaseError.code === 'auth/invalid-credential' || 
+              firebaseError.code === 'auth/invalid-email' ||
+              firebaseError.code === 'auth/wrong-password') {
+            
+            // For sub-admins, this is an error - they should have Firebase accounts
+            if (status === 'admin') {
+              console.error('Sub-admin login failed: Invalid credentials');
+              throw new Error('Invalid credentials. Please check your email and password.');
+            } 
+            // For regular employees, use manual authentication
+            else {
+              console.log('Using manual authentication for regular employee:', email);
+              // Create a mock user object
+              const mockUser: User = {
+                uid: email, // Using email as UID for non-Firebase users
+                email: email,
+                role: 'user' // Regular employees are always users
+              };
+              
+              // Set the user state directly
+              setUser(mockUser);
+              console.log('Manual authentication successful for user:', email);
+              return true;
+            }
+          } else {
+            // For other Firebase errors, re-throw them
+            console.error('Other Firebase error:', firebaseError.code, firebaseError.message);
+            throw firebaseError;
+          }
+        }
       }
     } catch (error: any) {
       console.error('Login error:', error);
@@ -192,14 +260,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.removeItem('adminCredentials');
       // Clear user state
       setUser(null);
-      setShouldRedirect(false);
     } catch (error) {
       console.error('Logout error:', error);
     }
   };
 
+  // Function to reset password for users with passwordResetRequired flag
+  const resetPassword = async (email: string, newPassword: string) => {
+    try {
+      console.log('Resetting password for user:', email);
+      
+      // Find the user document in Firestore
+      const employeesCollection = collection(db, 'employees');
+      const q = query(employeesCollection, where('email', '==', email));
+      const querySnapshot = await getDocs(q);
+      
+      if (querySnapshot.empty) {
+        throw new Error('User not found');
+      }
+      
+      const userDoc = querySnapshot.docs[0];
+      const docRef = doc(db, 'employees', userDoc.id);
+      
+      // Update the user document to set passwordResetRequired to false
+      await updateDoc(docRef, {
+        passwordResetRequired: false
+      });
+      
+      console.log('Password reset successful for user:', email);
+    } catch (error) {
+      console.error('Password reset error:', error);
+      throw error;
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, login, logout, loading, resetPassword, findUserByEmailOrIdentifier }}>
       {children}
     </AuthContext.Provider>
   );

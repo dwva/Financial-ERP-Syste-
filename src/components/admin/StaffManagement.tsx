@@ -83,7 +83,7 @@ const StaffManagement = () => {
         setIsDialogOpen(false);
         
         // Show success message
-        toast.success('Employee added successfully! Employee will need to reset their password on first login.');
+        toast.success('Employee added successfully! Employee can login directly with the provided password.');
         
         // Reset form
         setNewName('');

@@ -26,6 +26,7 @@ interface MovableSidebarProps {
   unreadCount: number;
   user: { email: string | null } | null;
   onLogout: () => void;
+  isMobile?: boolean;
 }
 
 const MovableSidebar = ({ 
@@ -33,7 +34,8 @@ const MovableSidebar = ({
   setActiveSection, 
   unreadCount, 
   user, 
-  onLogout 
+  onLogout,
+  isMobile = false
 }: MovableSidebarProps) => {
   const [sidebarExpanded, setSidebarExpanded] = useState(true);
   const [sidebarPosition, setSidebarPosition] = useState({ x: 0, y: 0 });
@@ -82,23 +84,32 @@ const MovableSidebar = ({
 
   // Handle mouse down for dragging
   const handleMouseDown = (e: React.MouseEvent) => {
-    if (sidebarRef.current) {
-      const rect = sidebarRef.current.getBoundingClientRect();
-      setDragOffset({
-        x: e.clientX - rect.left,
-        y: e.clientY - rect.top
-      });
-      setIsDragging(true);
-    }
+    // Only allow dragging on desktop
+    if (isMobile || !sidebarRef.current) return;
+    
+    const rect = sidebarRef.current.getBoundingClientRect();
+    setDragOffset({
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top
+    });
+    setIsDragging(true);
   };
 
   // Handle mouse move for dragging
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
-      if (isDragging) {
+      if (isDragging && sidebarRef.current && !isMobile) {
+        // Constrain dragging within viewport
+        const sidebarRect = sidebarRef.current.getBoundingClientRect();
+        const maxX = window.innerWidth - sidebarRect.width;
+        const maxY = window.innerHeight - sidebarRect.height;
+        
+        const newX = Math.max(0, Math.min(e.clientX - dragOffset.x, maxX));
+        const newY = Math.max(0, Math.min(e.clientY - dragOffset.y, maxY));
+        
         setSidebarPosition({
-          x: e.clientX - dragOffset.x,
-          y: e.clientY - dragOffset.y
+          x: newX,
+          y: newY
         });
       }
     };
@@ -116,27 +127,37 @@ const MovableSidebar = ({
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isDragging, dragOffset]);
+  }, [isDragging, dragOffset, isMobile]);
+
+  // Reset position when switching between mobile and desktop
+  useEffect(() => {
+    if (isMobile) {
+      setSidebarPosition({ x: 0, y: 0 });
+    }
+  }, [isMobile]);
 
   return (
     <div 
       ref={sidebarRef}
       style={{
-        position: isDragging ? 'absolute' : 'relative',
-        left: isDragging ? sidebarPosition.x : 'auto',
-        top: isDragging ? sidebarPosition.y : 'auto',
-        zIndex: isDragging ? 1000 : 'auto',
+        position: isMobile ? 'relative' : isDragging ? 'fixed' : 'sticky',
+        left: isMobile ? 'auto' : isDragging ? sidebarPosition.x : 'auto',
+        top: isMobile ? 'auto' : isDragging ? sidebarPosition.y : 'auto',
+        zIndex: isMobile ? 'auto' : isDragging ? 1000 : 'auto',
         width: sidebarExpanded ? '16rem' : '5rem',
         transition: isDragging ? 'none' : 'width 0.3s ease',
-        height: '100vh'
+        height: '100%',
+        maxHeight: '100vh'
       }}
       className="bg-white rounded-r-3xl shadow-lg flex flex-col"
     >
-      {/* Drag handle */}
-      <div 
-        className="absolute top-0 right-0 w-2 h-full cursor-move z-10"
-        onMouseDown={handleMouseDown}
-      />
+      {/* Drag handle - only show on desktop */}
+      {!isMobile && (
+        <div 
+          className="absolute top-0 right-0 w-2 h-full cursor-move z-10"
+          onMouseDown={handleMouseDown}
+        />
+      )}
       
       <div className="p-4 border-b border-grey-200 flex items-center justify-between">
         {sidebarExpanded && (
@@ -152,7 +173,7 @@ const MovableSidebar = ({
         </Button>
       </div>
       
-      <nav className="mt-4 px-2 flex-1">
+      <nav className="mt-4 px-2 flex-1 overflow-y-auto">
         {menuItems.map((item) => {
           const Icon = item.icon;
           return (

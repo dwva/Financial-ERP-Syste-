@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,9 +11,10 @@ import { useData } from '@/contexts/DataContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { Message } from '@/services/messageService';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Send, RefreshCw, FileText, Clock, Download, Trash2 } from 'lucide-react';
+import { Send, RefreshCw, FileText, Clock, Download, Trash2, Search } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { downloadLocalFile } from '@/services/messageFileService';
+import { Checkbox } from '@/components/ui/checkbox';
 
 const MessageUser = () => {
   const { employees, sendMessage, messages, loading: dataLoading, deleteMessage } = useData(); // Add deleteMessage
@@ -30,6 +31,8 @@ const MessageUser = () => {
   const [indexError, setIndexError] = useState<boolean>(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState<boolean>(false);
   const [messageToDelete, setMessageToDelete] = useState<{ id: string; subject: string } | null>(null);
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [selectedMessages, setSelectedMessages] = useState<string[]>([]);
 
   // Filter messages to show only those sent by the current admin
   useEffect(() => {
@@ -39,6 +42,21 @@ const MessageUser = () => {
       setInitialLoading(false);
     }
   }, [messages, user]);
+
+  // Filter messages based on search term
+  const filteredMessages = useMemo(() => {
+    return sentMessages.filter(message => {
+      if (!searchTerm) return true;
+      
+      const term = searchTerm.toLowerCase();
+      return (
+        (message.receiverName && message.receiverName.toLowerCase().includes(term)) ||
+        (message.subject && message.subject.toLowerCase().includes(term)) ||
+        (message.content && message.content.toLowerCase().includes(term)) ||
+        (message.fileName && message.fileName.toLowerCase().includes(term))
+      );
+    });
+  }, [sentMessages, searchTerm]);
 
   // Function to delete a message
   const handleDeleteMessage = async (messageId: string, messageSubject: string) => {
@@ -262,6 +280,41 @@ const MessageUser = () => {
     }
   };
 
+  // Selection functionality
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedMessages(filteredMessages.map(msg => msg.id));
+    } else {
+      setSelectedMessages([]);
+    }
+  };
+
+  const handleSelectMessage = (messageId: string, checked: boolean) => {
+    if (checked) {
+      setSelectedMessages(prev => [...prev, messageId]);
+    } else {
+      setSelectedMessages(prev => prev.filter(id => id !== messageId));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedMessages.length === 0) return;
+    
+    try {
+      setLoading(true);
+      for (const messageId of selectedMessages) {
+        await deleteMessage(messageId);
+      }
+      toast.success(`${selectedMessages.length} message(s) deleted successfully!`);
+      setSelectedMessages([]);
+    } catch (error: any) {
+      console.error('Error deleting messages:', error);
+      toast.error(`Failed to delete messages: ${error.message || 'Unknown error'}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -382,6 +435,30 @@ const MessageUser = () => {
                 </div>
               </div>
               
+              {/* Search and Bulk Actions */}
+              <div className="flex flex-col sm:flex-row gap-4">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search messages..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+                {selectedMessages.length > 0 && (
+                  <Button 
+                    variant="destructive" 
+                    size="sm" 
+                    onClick={handleBulkDelete}
+                    disabled={loading}
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Delete ({selectedMessages.length})
+                  </Button>
+                )}
+              </div>
+              
               {initialLoading ? (
                 <div className="text-center py-8">
                   <div className="flex justify-center mb-4">
@@ -415,16 +492,22 @@ const MessageUser = () => {
                     </Button>
                   </div>
                 </div>
-              ) : sentMessages.length === 0 ? (
+              ) : filteredMessages.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
-                  <p>No messages sent yet</p>
-                  <p className="text-sm mt-2">Send a message to see it appear in your history</p>
+                  <p>No messages found</p>
+                  <p className="text-sm mt-2">Try adjusting your search or send a new message</p>
                 </div>
               ) : (
                 <div className="border rounded-lg overflow-hidden">
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead className="w-12">
+                          <Checkbox
+                            checked={selectedMessages.length === filteredMessages.length && filteredMessages.length > 0}
+                            onCheckedChange={handleSelectAll}
+                          />
+                        </TableHead>
                         <TableHead>To</TableHead>
                         <TableHead>Subject</TableHead>
                         <TableHead>Date & Time</TableHead>
@@ -433,58 +516,67 @@ const MessageUser = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {sentMessages.map((message) => (
-                        <TableRow key={message.id}>
-                          <TableCell className="font-medium">
-                            {message.receiverName}
-                          </TableCell>
-                          <TableCell>{message.subject}</TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-1">
-                              <Clock className="w-4 h-4 text-muted-foreground" />
-                              <span>{formatTimestamp(message.timestamp)}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            {message.fileName ? (
-                              <div className="flex items-center gap-2">
-                                <FileText className="w-4 h-4" />
-                                <span className="text-sm">{message.fileName}</span>
-                                {message.fileUrl && (
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleDownloadFile(message.fileUrl!, message.fileName!)}
-                                    className="ml-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50"
-                                  >
-                                    <Download className="w-4 h-4" />
-                                  </Button>
-                                )}
+                      {filteredMessages.map((message) => {
+                        const isSelected = selectedMessages.includes(message.id);
+                        return (
+                          <TableRow key={message.id} className={isSelected ? 'bg-muted' : ''}>
+                            <TableCell>
+                              <Checkbox
+                                checked={isSelected}
+                                onCheckedChange={(checked) => handleSelectMessage(message.id, checked as boolean)}
+                              />
+                            </TableCell>
+                            <TableCell className="font-medium">
+                              {message.receiverName}
+                            </TableCell>
+                            <TableCell>{message.subject}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-1">
+                                <Clock className="w-4 h-4 text-muted-foreground" />
+                                <span>{formatTimestamp(message.timestamp)}</span>
                               </div>
-                            ) : (
-                              'No file attached'
-                            )}
-                            {/* Debug information */}
-                            {process.env.NODE_ENV === 'development' && message.fileName && (
-                              <div className="text-xs text-muted-foreground mt-1">
-                                Debug: fileUrl={message.fileUrl ? 'present' : 'missing'}
-                              </div>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDeleteMessage(message.id!, message.subject)}
-                              disabled={loading}
-                              className="text-red-600 hover:text-red-800 hover:bg-red-50"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                              <span className="sr-only">Delete</span>
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                            </TableCell>
+                            <TableCell>
+                              {message.fileName ? (
+                                <div className="flex items-center gap-2">
+                                  <FileText className="w-4 h-4" />
+                                  <span className="text-sm">{message.fileName}</span>
+                                  {message.fileUrl && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleDownloadFile(message.fileUrl!, message.fileName!)}
+                                      className="ml-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50"
+                                    >
+                                      <Download className="w-4 h-4" />
+                                    </Button>
+                                  )}
+                                </div>
+                              ) : (
+                                'No file attached'
+                              )}
+                              {/* Debug information */}
+                              {process.env.NODE_ENV === 'development' && message.fileName && (
+                                <div className="text-xs text-muted-foreground mt-1">
+                                  Debug: fileUrl={message.fileUrl ? 'present' : 'missing'}
+                                </div>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeleteMessage(message.id!, message.subject)}
+                                disabled={loading}
+                                className="text-red-600 hover:text-red-800 hover:bg-red-50"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                                <span className="sr-only">Delete</span>
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>

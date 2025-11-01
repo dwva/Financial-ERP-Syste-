@@ -67,32 +67,58 @@ export const reauthenticateAsAdmin = async () => {
   return true;
 };
 
-// Create employee user without causing any redirection by only creating Firestore document
-export const createEmployeeUser = async (email: string, password: string, username?: string, mobile?: string) => {
+// Create employee user with Firebase Authentication for sub-admins
+export const createEmployeeUser = async (email: string, password: string, username?: string, mobile?: string, status: 'employee' | 'admin' = 'employee') => {
   try {
-    // ONLY create user in employees collection in Firestore
-    // This completely prevents any Firebase Authentication user creation and automatic sign-in
-    const employeeData: any = {
-      email: email,
-      name: username || '',
-      sector: '',
-      age: 0,
-      status: 'employee',
-      // Store username and mobile if provided
-      ...(username && { username }),
-      ...(mobile && { mobile }),
-      // Store a placeholder for password reset - in a real app you'd use Firebase Admin SDK
-      passwordResetRequired: true
-    };
-    
-    const docRef = await addDoc(employeesCollection, employeeData);
-    
-    // Return a mock user object to maintain compatibility with existing code
-    // This prevents any auth state changes that could cause redirection
-    return {
-      uid: docRef.id,
-      email: email
-    } as any;
+    // For sub-admins, create both Firebase Authentication and Firestore records
+    if (status === 'admin') {
+      // Create user in Firebase Authentication
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      
+      // Add user to employees collection in Firestore
+      const employeeData: any = {
+        email: email,
+        name: username || '',
+        sector: '',
+        age: 0,
+        status: status,
+        // Store username and mobile if provided
+        ...(username && { username }),
+        ...(mobile && { mobile }),
+        // For sub-admins, no password reset required as they have a real password
+        passwordResetRequired: false
+      };
+      
+      await addDoc(employeesCollection, employeeData);
+      
+      return userCredential.user;
+    } 
+    // For regular employees, only create Firestore record
+    else {
+      // ONLY create user in employees collection in Firestore
+      // This completely prevents any Firebase Authentication user creation and automatic sign-in
+      const employeeData: any = {
+        email: email,
+        name: username || '',
+        sector: '',
+        age: 0,
+        status: status,
+        // Store username and mobile if provided
+        ...(username && { username }),
+        ...(mobile && { mobile }),
+        // No password reset required - users can login directly with their password
+        passwordResetRequired: false
+      };
+      
+      const docRef = await addDoc(employeesCollection, employeeData);
+      
+      // Return a mock user object to maintain compatibility with existing code
+      // This prevents any auth state changes that could cause redirection
+      return {
+        uid: docRef.id,
+        email: email
+      } as any;
+    }
   } catch (error) {
     console.error('Error creating employee user:', error);
     throw error;

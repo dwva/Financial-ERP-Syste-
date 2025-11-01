@@ -6,8 +6,8 @@ import {
   createEmployeeUser,
   updateEmployee as updateEmployeeService,
   deleteEmployee as deleteEmployeeService,
-  deleteExpense as deleteExpenseService,
   updateExpense as updateExpenseService,
+  deleteExpense as deleteExpenseService,
   getInvoices,
   createInvoice as createInvoiceService,
   getServiceCharges,
@@ -146,7 +146,7 @@ interface DataContextType {
   dropdownData: DropdownData[]; // Add this line
   loading: boolean;
   error: string | null;
-  addEmployee: (email: string, password: string, username?: string, mobile?: string) => Promise<void>;
+  addEmployee: (email: string, password: string, username?: string, mobile?: string, status?: 'employee' | 'admin') => Promise<void>;
   deleteEmployee: (id: string) => Promise<void>;
   addExpense: (expense: Omit<Expense, 'id' | 'timestamp'>, file?: File) => Promise<void>;
   updateEmployee: (updatedEmployee: Employee) => Promise<void>;
@@ -198,54 +198,24 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     console.log('Initializing DataContext');
     refreshData();
-    
-    // Set up real-time listener for expenses
-    const unsubscribeExpenses = onExpensesChange((newExpenses) => {
-      console.log('Expenses updated:', newExpenses.length);
-      setExpenses(newExpenses);
-    });
-    
-    // Set up real-time listener for messages
-    const unsubscribeMessages = onMessagesChange((newMessages) => {
-      console.log('Messages updated:', newMessages.length);
-      setMessages(newMessages);
-    });
-    
-    // Set up real-time listener for dropdown data
-    const unsubscribeDropdownData = onDropdownDataChange((newData) => {
-      console.log('Dropdown data updated:', newData.length);
-      setDropdownData(newData);
-    });
-    
-    setUnsubscribeExpenses(() => unsubscribeExpenses);
-    setUnsubscribeMessages(() => unsubscribeMessages);
-    
-    // Clean up listeners on unmount
-    return () => {
-      if (unsubscribeExpenses) {
-        unsubscribeExpenses();
-      }
-      if (unsubscribeMessages) {
-        unsubscribeMessages();
-      }
-      if (unsubscribeDropdownData) {
-        unsubscribeDropdownData();
-      }
-    };
   }, []);
 
   const refreshData = async () => {
     try {
       setLoading(true);
+      console.log('Refreshing data...');
+      
+      // Fetch all data concurrently
       const [employeesData, expensesData, invoicesData, serviceChargesData, invoiceHistoryData, profitLossReportsData, dropdownData] = await Promise.all([
         getEmployees(),
-        getExpenses(), // This will be replaced by real-time listener but keep for initial load
+        getExpenses(),
         getInvoices(),
         getServiceCharges(),
         getInvoiceHistory(),
         getProfitLossReports(),
-        getDropdownData() // Add this line
+        getDropdownData()
       ]);
+
       console.log('Data fetched:', {
         employees: employeesData.length,
         expenses: expensesData.length,
@@ -255,26 +225,51 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         profitLossReports: profitLossReportsData.length,
         dropdownData: dropdownData.length
       });
+
       setEmployees(employeesData);
       setExpenses(expensesData);
       setInvoices(invoicesData);
       setServiceCharges(serviceChargesData);
       setInvoiceHistory(invoiceHistoryData);
       setProfitLossReports(profitLossReportsData);
-      setDropdownData(dropdownData); // Add this line
-      setError(null);
+      setDropdownData(dropdownData);
+
+      // Set up real-time listeners
+      if (!unsubscribeExpenses) {
+        const unsubscribeExp = onExpensesChange((updatedExpenses) => {
+          console.log('Expenses updated via listener:', updatedExpenses.length);
+          setExpenses(updatedExpenses);
+        });
+        setUnsubscribeExpenses(() => unsubscribeExp);
+      }
+
+      if (!unsubscribeMessages) {
+        const unsubscribeMsg = onMessagesChange((updatedMessages) => {
+          console.log('Messages updated via listener:', updatedMessages.length);
+          setMessages(updatedMessages);
+        });
+        setUnsubscribeMessages(() => unsubscribeMsg);
+      }
+
+      // Set up dropdown data listener
+      const unsubscribeDropdown = onDropdownDataChange((updatedData) => {
+        console.log('Dropdown data updated via listener:', updatedData.length);
+        setDropdownData(updatedData);
+      });
+      // We don't need to store this unsubscribe function as it's less critical
+
     } catch (err) {
-      console.error('Error fetching data:', err);
+      console.error('Error refreshing data:', err);
       setError('Failed to load data');
     } finally {
       setLoading(false);
     }
   };
 
-  const addEmployee = async (email: string, password: string, username?: string, mobile?: string) => {
+  const addEmployee = async (email: string, password: string, username?: string, mobile?: string, status: 'employee' | 'admin' = 'employee') => {
     try {
       // Create user in Firebase Authentication and Firestore
-      await createEmployeeUser(email, password, username, mobile);
+      await createEmployeeUser(email, password, username, mobile, status);
       // Refresh data to show the new employee
       await refreshData();
     } catch (err) {

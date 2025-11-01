@@ -141,12 +141,25 @@ const InvoiceGeneration = ({ onNavigateToHistory }: InvoiceGenerationProps) => {
       return;
     }
     
+    // Generate a new invoice number
+    setInvoiceNumber(`INV-${Date.now().toString().slice(-6)}`);
+    
     toast.success('Invoice generated successfully!');
   };
 
   const handleDownloadPDF = async () => {
     if (!invoiceRef.current) {
       toast.error('Invoice preview not available');
+      return;
+    }
+    
+    if (!invoiceData.companyName || !invoiceData.date) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+    
+    if (invoiceItems.length === 0) {
+      toast.error('Please add at least one service item');
       return;
     }
     

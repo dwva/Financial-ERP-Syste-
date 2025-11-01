@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useData } from '@/contexts/DataContext';
 import { useNotification } from '@/contexts/NotificationContext'; // Add this import
-import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -27,7 +26,6 @@ const UserDashboard = () => {
   const { user, logout } = useAuth();
   const { employees, updateEmployee, refreshData } = useData();
   const { unreadCount } = useNotification(); // Add this hook
-  const navigate = useNavigate();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [name, setName] = useState('');
   const [sector, setSector] = useState('');
@@ -55,9 +53,14 @@ const UserDashboard = () => {
     refreshData();
   }, []);
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
+  const handleLogout = async () => {
+    try {
+      await logout();
+      // Navigation is now handled by ProtectedRoute component
+      // No need to manually navigate to /login
+    } catch (error) {
+      console.error('Failed to logout:', error);
+    }
   };
 
   const handleProfilePictureChange = (e: React.ChangeEvent<HTMLInputElement>) => {
