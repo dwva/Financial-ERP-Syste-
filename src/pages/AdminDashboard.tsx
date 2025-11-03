@@ -14,6 +14,7 @@ import MessageUser from '@/components/admin/MessageUser';
 import MovableSidebar from '@/components/admin/MovableSidebar';
 import OverdueExpenses from '@/components/admin/OverdueExpenses';
 import DataManagement from '@/components/admin/DataManagement';
+import ExpensesOverview from '@/components/admin/ExpensesOverview';
 import { Button } from '@/components/ui/button';
 import { Menu } from 'lucide-react';
 
@@ -55,6 +56,8 @@ const AdminDashboard = () => {
         return <FinancialOverview />;
       case 'expenses':
         return <AllExpensesTableEnhanced />;
+      case 'expense-overview':
+        return <ExpensesOverview />;
       case 'users':
         return <UserManagement />;
       case 'expense-status':

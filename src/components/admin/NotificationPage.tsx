@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { Bell, BellOff, CheckCircle, Clock, Receipt, Calendar } from 'lucide-react';
+import { Bell, BellOff, CheckCircle, Clock, Receipt, Calendar, ArrowUpDown } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const NotificationPage = () => {
@@ -96,6 +96,12 @@ const NotificationPage = () => {
           return <Receipt className="w-4 h-4" />;
         case 'expense_updated':
           return <Receipt className="w-4 h-4" />;
+        case 'expense_status_changed':
+          return <Receipt className="w-4 h-4" />;
+        case 'invoice_generated':
+          return <Receipt className="w-4 h-4" />;
+        case 'profit_loss_updated':
+          return <ArrowUpDown className="w-4 h-4" />;
         default:
           return <Bell className="w-4 h-4" />;
       }
@@ -107,6 +113,12 @@ const NotificationPage = () => {
           return 'bg-blue-100 text-blue-800 border-blue-200';
         case 'expense_updated':
           return 'bg-green-100 text-green-800 border-green-200';
+        case 'expense_status_changed':
+          return 'bg-purple-100 text-purple-800 border-purple-200';
+        case 'invoice_generated':
+          return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+        case 'profit_loss_updated':
+          return 'bg-indigo-100 text-indigo-800 border-indigo-200';
         default:
           return 'bg-gray-100 text-gray-800 border-gray-200';
       }
@@ -119,31 +131,34 @@ const NotificationPage = () => {
     };
 
     return (
-      <Card>
+      <Card className="w-full">
         <CardHeader>
           <div className="flex flex-col gap-4">
             <div className="flex items-center justify-between flex-wrap gap-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-accent/10 rounded-lg">
-                  <Bell className="w-5 h-5 text-accent" />
+                <div className="p-2 bg-primary/10 rounded-lg">
+                  <Bell className="w-5 h-5 text-primary" />
                 </div>
                 <div>
-                  <CardTitle>Notifications</CardTitle>
-                  <CardDescription>
+                  <CardTitle className="text-lg">Notifications</CardTitle>
+                  <CardDescription className="text-sm">
                     {unreadCount > 0 
                       ? `${unreadCount} unread notification${unreadCount > 1 ? 's' : ''}` 
                       : 'No unread notifications'}
                   </CardDescription>
                 </div>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 <Button 
                   variant="outline" 
                   onClick={markAllAsRead}
                   disabled={unreadCount === 0}
+                  className="text-sm"
+                  size="sm"
                 >
                   <CheckCircle className="w-4 h-4 mr-2" />
-                  Mark All Read
+                  <span className="hidden sm:inline">Mark All Read</span>
+                  <span className="sm:hidden">All Read</span>
                 </Button>
                 {selectedNotifications.length > 0 && (
                   <Button 
@@ -164,6 +179,8 @@ const NotificationPage = () => {
                       }
                     }}
                     disabled={isDeleting}
+                    className="text-sm"
+                    size="sm"
                   >
                     {isDeleting ? 'Deleting...' : `Delete (${selectedNotifications.length})`}
                   </Button>
@@ -171,8 +188,8 @@ const NotificationPage = () => {
               </div>
             </div>
             
-            {/* Filter Section */}
-            <div className="flex flex-wrap gap-4 p-4 bg-muted/50 rounded-lg">
+            {/* Filter Section - Responsive */}
+            <div className="flex flex-wrap gap-3 p-3 bg-muted/50 rounded-lg">
               {/* Select All Checkbox */}
               <div className="flex items-center space-x-2">
                 <input 
@@ -185,17 +202,18 @@ const NotificationPage = () => {
                       setSelectedNotifications([]);
                     }
                   }}
-                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
                 />
                 <span className="text-sm">Select All</span>
               </div>
               
               {/* Read/Unread Filter */}
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 <Button
                   variant={filter === 'all' ? 'default' : 'outline'}
                   onClick={() => setFilter('all')}
                   size="sm"
+                  className="text-sm"
                 >
                   All
                 </Button>
@@ -203,11 +221,11 @@ const NotificationPage = () => {
                   variant={filter === 'unread' ? 'default' : 'outline'}
                   onClick={() => setFilter('unread')}
                   size="sm"
-                  className={unreadCount > 0 ? 'relative' : ''}
+                  className="text-sm relative"
                 >
                   Unread
                   {unreadCount > 0 && (
-                    <Badge className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center p-0">
+                    <Badge className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center p-0">
                       {unreadCount}
                     </Badge>
                   )}
@@ -216,15 +234,16 @@ const NotificationPage = () => {
                   variant={filter === 'read' ? 'default' : 'outline'}
                   onClick={() => setFilter('read')}
                   size="sm"
+                  className="text-sm"
                 >
                   Read
                 </Button>
               </div>
               
               {/* Date Filter */}
-              <div className="w-40">
+              <div className="w-full sm:w-40">
                 <Select value={selectedDate || ''} onValueChange={setSelectedDate}>
-                  <SelectTrigger>
+                  <SelectTrigger className="text-sm">
                     <div className="flex items-center">
                       <Calendar className="w-4 h-4 mr-2" />
                       <SelectValue placeholder="Filter by date" />
@@ -235,7 +254,7 @@ const NotificationPage = () => {
                     {uniqueDates
                       .filter(date => date && date !== 'Unknown') // Filter out invalid dates
                       .map(date => (
-                        <SelectItem key={date} value={date}>
+                        <SelectItem key={date} value={date} className="text-sm">
                           {new Date(date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
                         </SelectItem>
                       ))}
@@ -244,9 +263,9 @@ const NotificationPage = () => {
               </div>
               
               {/* Month Filter */}
-              <div className="w-40">
+              <div className="w-full sm:w-40">
                 <Select value={selectedMonth || ''} onValueChange={setSelectedMonth}>
-                  <SelectTrigger>
+                  <SelectTrigger className="text-sm">
                     <div className="flex items-center">
                       <Calendar className="w-4 h-4 mr-2" />
                       <SelectValue placeholder="Filter by month" />
@@ -257,15 +276,16 @@ const NotificationPage = () => {
                     {uniqueMonths
                       .filter(month => month && month !== 'Unknown') // Filter out invalid months
                       .map(month => (
-                        <SelectItem key={month} value={month}>{month}</SelectItem>
+                        <SelectItem key={month} value={month} className="text-sm">{month}</SelectItem>
                       ))}
                   </SelectContent>
                 </Select>
               </div>
 
               {/* Clear Filters Button */}
-              <Button variant="outline" onClick={clearFilters} className="gap-2">
-                Clear Filters
+              <Button variant="outline" onClick={clearFilters} className="gap-2 text-sm" size="sm">
+                <span className="hidden sm:inline">Clear Filters</span>
+                <span className="sm:hidden">Clear</span>
               </Button>
             </div>
           </div>
@@ -279,11 +299,11 @@ const NotificationPage = () => {
                 <p className="text-sm">Try adjusting your filters</p>
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {filteredNotifications.map((notification) => (
                   <div
                     key={notification.id}
-                    className={`p-4 rounded-lg border transition-all ${
+                    className={`p-3 rounded-lg border transition-all ${
                       notification.read 
                         ? 'bg-muted/50 border-muted' 
                         : 'bg-background border-primary/20 shadow-sm'
@@ -300,22 +320,22 @@ const NotificationPage = () => {
                             setSelectedNotifications(selectedNotifications.filter(id => id !== notification.id));
                           }
                         }}
-                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 mt-1"
+                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary mt-1"
                       />
                       <div className={`p-2 rounded-full ${getNotificationColor(notification.type)}`}>
                         {getNotificationIcon(notification.type)}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between">
-                          <h3 className="font-medium">{notification.title}</h3>
+                          <h3 className="font-medium text-foreground text-sm">{notification.title}</h3>
                           {!notification.read && (
-                            <Badge className="bg-primary text-primary-foreground">
+                            <Badge className="bg-primary text-primary-foreground text-xs">
                               <Clock className="w-3 h-3 mr-1" />
                               New
                             </Badge>
                           )}
                         </div>
-                        <p className="text-sm text-muted-foreground mt-1">
+                        <p className="text-xs text-muted-foreground mt-1">
                           {notification.message}
                         </p>
                         <p className="text-xs text-muted-foreground mt-2">

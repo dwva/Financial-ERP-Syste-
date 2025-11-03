@@ -1,16 +1,19 @@
-import { useState, useRef, useMemo } from 'react';
+import { useState, useRef, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'react-toastify';
 import { Download, FileText, Search, History, Edit } from 'lucide-react';
 import { useData } from '@/contexts/DataContext';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { getCompanyNamesFromExpenses } from '@/utils/expenseUtils';
+import AutocompleteDropdown from '@/components/admin/AutocompleteDropdown';
 
 interface InvoiceGenerationProps {
   onNavigateToHistory?: () => void;
@@ -26,10 +29,11 @@ interface InvoiceItem {
 }
 
 const InvoiceGeneration = ({ onNavigateToHistory }: InvoiceGenerationProps) => {
-  const { employees, expenses, serviceCharges, addInvoiceHistory, dropdownData } = useData();
+  const { employees, expenses, serviceCharges, addInvoiceHistory, dropdownData, updateExpense } = useData();
   const [invoiceData, setInvoiceData] = useState({
     companyName: '',
     candidateName: '',
+    clientName: '',
     date: new Date().toISOString().split('T')[0],
     dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     sector: '',
@@ -49,6 +53,8 @@ const InvoiceGeneration = ({ onNavigateToHistory }: InvoiceGenerationProps) => {
   const [invoiceItems, setInvoiceItems] = useState<InvoiceItem[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [invoiceNumber, setInvoiceNumber] = useState(`INV-${Date.now().toString().slice(-6)}`);
+  const [associatedExpenses, setAssociatedExpenses] = useState<any[]>([]); // Track expenses associated with this invoice
+  const [selectedExpenses, setSelectedExpenses] = useState<Record<string, boolean>>({}); // Track selected expenses
   const invoiceRef = useRef<HTMLDivElement>(null);
 
   // Filter service charges based on search term and sort alphabetically
@@ -64,6 +70,70 @@ const InvoiceGeneration = ({ onNavigateToHistory }: InvoiceGenerationProps) => {
     dropdownData.filter(item => item.type === 'sector').map(item => item.value), 
     [dropdownData]
   );
+
+  // Get client options from dropdown data
+  const clientOptions = useMemo(() => 
+    dropdownData.filter(item => item.type === 'client').map(item => item.value), 
+    [dropdownData]
+  );
+
+  // Find expenses that match ALL the current invoice criteria
+  useEffect(() => {
+    if (invoiceData.companyName || invoiceData.clientName || invoiceData.candidateName) {
+      const matchingExpenses = expenses.filter(expense => {
+        // Check each field - if field is filled in invoice, it must match expense
+        let matches = true;
+        
+        // Match by company name (if provided in invoice)
+        if (invoiceData.companyName) {
+          matches = matches && 
+            expense.company && 
+            expense.company.toLowerCase().includes(invoiceData.companyName.toLowerCase());
+        }
+          
+        // Match by client name (if provided in invoice)
+        if (invoiceData.clientName) {
+          matches = matches && 
+            expense.clientName && 
+            expense.clientName.toLowerCase().includes(invoiceData.clientName.toLowerCase());
+        }
+          
+        // Match by candidate name (if provided in invoice)
+        if (invoiceData.candidateName) {
+          matches = matches && 
+            expense.candidateName && 
+            expense.candidateName.toLowerCase().includes(invoiceData.candidateName.toLowerCase());
+        }
+        
+        return matches;
+      });
+      
+      setAssociatedExpenses(matchingExpenses);
+      
+      // Initialize all expenses as selected by default
+      const initialSelection: Record<string, boolean> = {};
+      matchingExpenses.forEach(expense => {
+        initialSelection[expense.id] = true;
+      });
+      setSelectedExpenses(initialSelection);
+    } else {
+      setAssociatedExpenses([]);
+      setSelectedExpenses({});
+    }
+  }, [invoiceData.companyName, invoiceData.clientName, invoiceData.candidateName, expenses]);
+
+  // Handle expense selection
+  const handleExpenseSelection = (expenseId: string, isSelected: boolean) => {
+    setSelectedExpenses(prev => ({
+      ...prev,
+      [expenseId]: isSelected
+    }));
+  };
+
+  // Get selected expenses
+  const getSelectedExpenses = () => {
+    return associatedExpenses.filter(expense => selectedExpenses[expense.id]);
+  };
 
   const handleInputChange = (field: string, value: string) => {
     setInvoiceData({ ...invoiceData, [field]: value });
@@ -163,6 +233,9 @@ const InvoiceGeneration = ({ onNavigateToHistory }: InvoiceGenerationProps) => {
       return;
     }
     
+    // Get only selected expenses
+    const selectedExpensesList = getSelectedExpenses();
+    
     try {
       // Generate PDF using html2canvas and jsPDF
       const canvas = await html2canvas(invoiceRef.current, {
@@ -201,6 +274,7 @@ const InvoiceGeneration = ({ onNavigateToHistory }: InvoiceGenerationProps) => {
         dueDate: invoiceData.dueDate,
         companyName: invoiceData.companyName,
         candidateName: invoiceData.candidateName,
+        clientName: invoiceData.clientName,
         businessName: invoiceData.businessName,
         businessTagline: invoiceData.businessTagline,
         businessAddress: invoiceData.businessAddress,
@@ -221,7 +295,35 @@ const InvoiceGeneration = ({ onNavigateToHistory }: InvoiceGenerationProps) => {
       
       await addInvoiceHistory(invoiceToSave);
       
-      toast.success('PDF downloaded and invoice saved to history successfully!');
+      // Update only selected expenses to make their status changeable
+      if (selectedExpensesList.length > 0) {
+        for (const expense of selectedExpensesList) {
+          try {
+            // Update expense with invoice-related data - map ALL three values
+            const updateData: any = {
+              hasInvoice: true
+            };
+            
+            // Only update fields if they exist in the invoice
+            if (invoiceData.clientName) {
+              updateData.clientName = invoiceData.clientName;
+            }
+            if (invoiceData.companyName) {
+              updateData.company = invoiceData.companyName;
+            }
+            if (invoiceData.candidateName) {
+              updateData.candidateName = invoiceData.candidateName;
+            }
+            
+            await updateExpense(expense.id, updateData);
+          } catch (error) {
+            console.error('Error updating expense:', error);
+          }
+        }
+        toast.success(`PDF downloaded and ${selectedExpensesList.length} expenses updated successfully!`);
+      } else {
+        toast.success('PDF downloaded and invoice saved to history successfully!');
+      }
     } catch (error) {
       console.error('Error generating PDF:', error);
       toast.error('Failed to generate PDF. Please try again.');
@@ -378,42 +480,131 @@ const InvoiceGeneration = ({ onNavigateToHistory }: InvoiceGenerationProps) => {
             )}
           </div>
 
+          {/* Associated Expenses Section */}
+          {associatedExpenses.length > 0 && (
+            <div className="border rounded-lg p-4 bg-blue-50">
+              <h3 className="text-lg font-semibold mb-2">Associated Expenses ({getSelectedExpenses().length} of {associatedExpenses.length} selected)</h3>
+              <p className="text-sm text-muted-foreground mb-3">
+                These expenses will be linked to this invoice. Select which expenses to include in this invoice.
+              </p>
+              <div className="max-h-60 overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-muted">
+                      <th className="text-left p-2">Select</th>
+                      <th className="text-left p-2">Employee</th>
+                      <th className="text-left p-2">Amount</th>
+                      <th className="text-left p-2">Description</th>
+                      <th className="text-left p-2">Client</th>
+                      <th className="text-left p-2">Company</th>
+                      <th className="text-left p-2">Candidate</th>
+                      <th className="text-left p-2">Date</th>
+                      <th className="text-left p-2">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {associatedExpenses.map((expense) => {
+                      const employee = employees.find(emp => emp.email === expense.userId);
+                      return (
+                        <tr key={expense.id} className="border-b">
+                          <td className="p-2">
+                            <Checkbox
+                              checked={selectedExpenses[expense.id] || false}
+                              onCheckedChange={(checked) => handleExpenseSelection(expense.id, !!checked)}
+                            />
+                          </td>
+                          <td className="p-2">{employee?.name || expense.userId}</td>
+                          <td className="p-2">{formatAmount(expense.amount)}</td>
+                          <td className="p-2">{expense.description}</td>
+                          <td className="p-2">{expense.clientName || 'N/A'}</td>
+                          <td className="p-2">{expense.company || 'N/A'}</td>
+                          <td className="p-2">{expense.candidateName || 'N/A'}</td>
+                          <td className="p-2">{new Date(expense.date).toLocaleDateString()}</td>
+                          <td className="p-2">
+                            <Badge variant={expense.status === 'received' ? 'default' : 'secondary'}>
+                              {expense.status || 'pending'}
+                            </Badge>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <div className="mt-2 flex gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => {
+                    const allSelected: Record<string, boolean> = {};
+                    associatedExpenses.forEach(expense => {
+                      allSelected[expense.id] = true;
+                    });
+                    setSelectedExpenses(allSelected);
+                  }}
+                >
+                  Select All
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => {
+                    const noneSelected: Record<string, boolean> = {};
+                    associatedExpenses.forEach(expense => {
+                      noneSelected[expense.id] = false;
+                    });
+                    setSelectedExpenses(noneSelected);
+                  }}
+                >
+                  Deselect All
+                </Button>
+              </div>
+            </div>
+          )}
+
           {/* Invoice Form */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="companyName">Company Name (TO) *</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="companyName"
-                    placeholder="Enter company name"
-                    value={invoiceData.companyName}
-                    onChange={(e) => handleInputChange('companyName', e.target.value)}
-                    list="company-names"
-                    className="flex-1"
-                  />
-                  {expenses.length > 0 && (
-                    <datalist id="company-names">
-                      {getCompanyNamesFromExpenses(expenses).map((companyName, index) => (
-                        <option key={index} value={companyName} />
-                      ))}
-                    </datalist>
-                  )}
-                </div>
+                <AutocompleteDropdown
+                  id="companyName"
+                  label="Company Name (TO) *"
+                  placeholder="Enter or select company name"
+                  value={invoiceData.companyName}
+                  onChange={(value) => handleInputChange('companyName', value)}
+                  options={[
+                    ...getCompanyNamesFromExpenses(expenses),
+                    ...dropdownData.filter(item => item.type === 'company').map(item => item.value)
+                  ]}
+                />
                 {expenses.length > 0 && (
                   <p className="text-sm text-muted-foreground">
-                    Start typing to see company names from your expenses
+                    Start typing to see company names from your expenses and dropdown data
                   </p>
                 )}
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="candidateName">Candidate Name</Label>
-                <Input
+                <AutocompleteDropdown
+                  id="clientName"
+                  label="Client Name"
+                  placeholder="Enter or select client name"
+                  value={invoiceData.clientName}
+                  onChange={(value) => handleInputChange('clientName', value)}
+                  options={clientOptions}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <AutocompleteDropdown
                   id="candidateName"
-                  placeholder="Enter candidate name"
+                  label="Candidate Name"
+                  placeholder="Enter or select candidate name"
                   value={invoiceData.candidateName}
-                  onChange={(e) => handleInputChange('candidateName', e.target.value)}
+                  onChange={(value) => handleInputChange('candidateName', value)}
+                  options={[
+                    ...dropdownData.filter(item => item.type === 'candidate').map(item => item.value)
+                  ]}
                 />
               </div>
               
@@ -617,6 +808,7 @@ const InvoiceGeneration = ({ onNavigateToHistory }: InvoiceGenerationProps) => {
                     {invoiceData.candidateName && (
                       <p className="mt-1 text-gray-600">Candidate: {invoiceData.candidateName}</p>
                     )}
+                    {/* Client name is not shown in the invoice bill as per requirement */}
                   </div>
                   <div className="text-right">
                     <div className="grid grid-cols-2 gap-4">

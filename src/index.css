@@ -11,95 +11,95 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 0 0% 0%;
+    --background: 0 0% 100%; /* White */
+    --foreground: 0 0% 0%; /* Black */
     
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 0%;
+    --card: 0 0% 100%; /* White */
+    --card-foreground: 0 0% 0%; /* Black */
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 0%;
+    --popover: 0 0% 100%; /* White */
+    --popover-foreground: 0 0% 0%; /* Black */
 
-    --primary: 0 0% 100%;
-    --primary-foreground: 0 0% 0%;
+    --primary: 120 70% 40%; /* Light Green */
+    --primary-foreground: 0 0% 100%; /* White */
 
-    --secondary: 220 40% 95%;
-    --secondary-foreground: 222 47% 11%;
+    --secondary: 0 0% 95%; /* Light Gray */
+    --secondary-foreground: 0 0% 0%; /* Black */
 
-    --muted: 220 40% 95%;
-    --muted-foreground: 215 18% 50%;
+    --muted: 0 0% 90%; /* Gray */
+    --muted-foreground: 0 0% 30%; /* Dark Gray */
 
-    --accent: 255 75% 60%;
-    --accent-foreground: 0 0% 100%;
+    --accent: 120 70% 45%; /* Slightly Darker Light Green */
+    --accent-foreground: 0 0% 100%; /* White */
 
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 100%;
+    --destructive: 0 100% 30%; /* Red */
+    --destructive-foreground: 0 0% 100%; /* White */
 
-    --border: 220 32% 90%;
-    --input: 220 32% 90%;
-    --ring: 255 75% 60%;
+    --border: 0 0% 85%; /* Light Gray Border */
+    --input: 0 0% 85%; /* Light Gray Input */
+    --ring: 120 70% 40%; /* Light Green Ring */
 
-    --success: 142 76% 36%;
-    --success-foreground: 0 0% 100%;
+    --success: 120 70% 40%; /* Light Green */
+    --success-foreground: 0 0% 100%; /* White */
 
-    --warning: 38 92% 50%;
-    --warning-foreground: 0 0% 100%;
+    --warning: 40 100% 40%; /* Amber */
+    --warning-foreground: 0 0% 100%; /* White */
 
     --radius: 1rem;
 
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-background: 0 0% 98%; /* Very Light Gray */
+    --sidebar-foreground: 0 0% 20%; /* Dark Gray */
+    --sidebar-primary: 120 70% 40%; /* Light Green */
+    --sidebar-primary-foreground: 0 0% 100%; /* White */
+    --sidebar-accent: 0 0% 95%; /* Light Gray */
+    --sidebar-accent-foreground: 0 0% 0%; /* Black */
+    --sidebar-border: 0 0% 90%; /* Gray Border */
+    --sidebar-ring: 120 70% 40%; /* Light Green Ring */
   }
 
   .dark {
-    --background: 222 47% 11%;
-    --foreground: 210 40% 98%;
-
-    --card: 222 47% 13%;
-    --card-foreground: 210 40% 98%;
-
-    --popover: 222 47% 13%;
-    --popover-foreground: 210 40% 98%;
-
-    --primary: 0 0% 100%;
-    --primary-foreground: 0 0% 0%;
-
-    --secondary: 217 33% 18%;
-    --secondary-foreground: 210 40% 98%;
-
-    --muted: 217 33% 18%;
-    --muted-foreground: 215 20% 65%;
-
-    --accent: 255 75% 60%;
-    --accent-foreground: 0 0% 100%;
-
-    --destructive: 0 63% 31%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 217 33% 18%;
-    --input: 217 33% 18%;
-    --ring: 255 75% 60%;
-
-    --success: 142 76% 36%;
-    --success-foreground: 0 0% 100%;
-
-    --warning: 38 92% 50%;
-    --warning-foreground: 0 0% 100%;
+    --background: 0 0% 10%; /* Dark Gray */
+    --foreground: 0 0% 100%; /* White */
     
-    --sidebar-background: 240 6% 10%;
-    --sidebar-foreground: 240 5% 96%;
-    --sidebar-primary: 224 76% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 4% 16%;
-    --sidebar-accent-foreground: 240 5% 96%;
-    --sidebar-border: 240 4% 16%;
-    --sidebar-ring: 217 91% 60%;
+    --card: 0 0% 15%; /* Darker Gray */
+    --card-foreground: 0 0% 100%; /* White */
+
+    --popover: 0 0% 15%; /* Darker Gray */
+    --popover-foreground: 0 0% 100%; /* White */
+
+    --primary: 120 70% 50%; /* Light Green */
+    --primary-foreground: 0 0% 0%; /* Black */
+
+    --secondary: 0 0% 20%; /* Gray */
+    --secondary-foreground: 0 0% 100%; /* White */
+
+    --muted: 0 0% 25%; /* Dark Gray */
+    --muted-foreground: 0 0% 70%; /* Light Gray */
+
+    --accent: 120 70% 55%; /* Lighter Green */
+    --accent-foreground: 0 0% 0%; /* Black */
+
+    --destructive: 0 100% 40%; /* Lighter Red */
+    --destructive-foreground: 0 0% 100%; /* White */
+
+    --border: 0 0% 25%; /* Dark Gray Border */
+    --input: 0 0% 25%; /* Dark Gray Input */
+    --ring: 120 70% 50%; /* Light Green Ring */
+
+    --success: 120 70% 50%; /* Lighter Green */
+    --success-foreground: 0 0% 0%; /* Black */
+
+    --warning: 40 100% 50%; /* Lighter Amber */
+    --warning-foreground: 0 0% 0%; /* Black */
+    
+    --sidebar-background: 0 0% 12%; /* Dark Gray */
+    --sidebar-foreground: 0 0% 90%; /* Light Gray */
+    --sidebar-primary: 120 70% 50%; /* Lighter Green */
+    --sidebar-primary-foreground: 0 0% 0%; /* Black */
+    --sidebar-accent: 0 0% 20%; /* Gray */
+    --sidebar-accent-foreground: 0 0% 100%; /* White */
+    --sidebar-border: 0 0% 20%; /* Gray Border */
+    --sidebar-ring: 120 70% 50%; /* Lighter Green Ring */
   }
 }
 
@@ -109,17 +109,28 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground font-body;
+    @apply bg-background text-foreground font-body text-sm;
   }
   
   h1, h2, h3, h4, h5, h6 {
     @apply font-heading;
   }
+  
+  /* Base text sizes */
+  .text-xs { font-size: 0.7rem; }
+  .text-sm { font-size: 0.8rem; }
+  .text-base { font-size: 0.9rem; }
+  .text-lg { font-size: 1rem; }
+  .text-xl { font-size: 1.1rem; }
+  .text-2xl { font-size: 1.2rem; }
+  .text-3xl { font-size: 1.3rem; }
+  .text-4xl { font-size: 1.4rem; }
+  .text-5xl { font-size: 1.5rem; }
 }
 
 @layer components {
   .btn-rounded {
-    @apply rounded-2xl px-6 py-3 font-medium transition-all duration-300;
+    @apply rounded-2xl px-4 py-2 font-medium transition-all duration-300 text-sm;
   }
   
   .card-rounded {
@@ -127,18 +138,18 @@ All colors MUST be HSL.
   }
   
   .input-rounded {
-    @apply rounded-xl border-2 focus:ring-2 focus:ring-violet-500;
+    @apply rounded-xl border-2 focus:ring-2 focus:ring-primary text-sm;
   }
   
   .select-rounded {
-    @apply rounded-xl border-2 focus:ring-2 focus:ring-violet-500;
+    @apply rounded-xl border-2 focus:ring-2 focus:ring-primary text-sm;
   }
   
-  .chart-violet {
-    @apply text-violet-500 fill-violet-500;
+  .chart-primary {
+    @apply text-primary fill-primary;
   }
   
-  .chart-grey {
-    @apply text-grey-400 fill-grey-400;
+  .chart-muted {
+    @apply text-muted-foreground fill-muted-foreground;
   }
 }

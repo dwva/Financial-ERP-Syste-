@@ -1,31 +1,21 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Search, ArrowUpDown, Filter, RefreshCw, CheckCircle, XCircle, Save, Calendar, Trash2 } from 'lucide-react';
+import { Search, ArrowUpDown, Filter, RefreshCw, CheckCircle, XCircle, Calendar } from 'lucide-react';
 import { useData } from '@/contexts/DataContext';
+import { useNotification } from '@/contexts/NotificationContext';
 import { toast } from 'react-toastify';
-import { ProfitLossReport } from '@/contexts/DataContext';
-import AlertDialog from './AlertDialog';
 
 const ProfitLoss = () => {
-  const { expenses, invoiceHistory, refreshData, profitLossReports, addProfitLossReport, deleteProfitLossReport } = useData();
+  const { expenses, invoiceHistory, refreshData, addProfitLossReport } = useData();
+  const { addNotification } = useNotification();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterMonth, setFilterMonth] = useState<string>('all');
   const [filterYear, setFilterYear] = useState<string>('all');
   const [sortField, setSortField] = useState<'client' | 'revenue' | 'expenses' | 'profit'>('client');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
-  const [expenseInvoiceMap, setExpenseInvoiceMap] = useState<Record<string, string>>({});
-  const [savedInvoices, setSavedInvoices] = useState<Record<string, { invoiceNumber: string, amount: number }>>({});
-  const [activeTab, setActiveTab] = useState<'current' | 'saved'>('current');
-  const [lastSavedReport, setLastSavedReport] = useState<ProfitLossReport | null>(null);
-
-  // State for delete confirmation dialog
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [reportToDelete, setReportToDelete] = useState<{id: string, period: string, month?: string, year: string} | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
 
   // Get unique months and years from expenses
   const uniqueMonths = useMemo(() => {
@@ -56,25 +46,27 @@ const ProfitLoss = () => {
     return Array.from(years).sort((a, b) => parseInt(b) - parseInt(a));
   }, [expenses]);
 
-  // Get all expense IDs that have been saved in the last saved report
-  const reportedExpenseIds = useMemo(() => {
-    const ids = new Set<string>();
-    if (lastSavedReport) {
-      lastSavedReport.reportData.forEach(data => {
-        if (data.expenseId && data.invoiceNumber) {
-          ids.add(data.expenseId);
-        }
-      });
-    }
-    return ids;
-  }, [lastSavedReport]);
+  // Find invoice for an expense based on matching criteria
+  const findInvoiceForExpense = (expense: any) => {
+    // Look for invoices that match the expense criteria
+    return invoiceHistory.find(invoice => {
+      // Match by company name
+      if (expense.company && invoice.companyName) {
+        return expense.company.toLowerCase() === invoice.companyName.toLowerCase();
+      }
+      
+      // Match by candidate name
+      if (expense.candidateName && invoice.candidateName) {
+        return expense.candidateName.toLowerCase() === invoice.candidateName.toLowerCase();
+      }
+      
+      return false;
+    });
+  };
 
-  // Filter expenses by month and year, and exclude only those in the last saved report
+  // Filter expenses by month and year
   const filteredExpenses = useMemo(() => {
     let filtered = [...expenses];
-    
-    // Exclude expenses that are in the last saved report and have invoice numbers
-    filtered = filtered.filter(expense => !reportedExpenseIds.has(expense.id));
     
     if (filterMonth !== 'all') {
       filtered = filtered.filter(expense => {
@@ -102,59 +94,49 @@ const ProfitLoss = () => {
     }
     
     return filtered;
-  }, [expenses, filterMonth, filterYear, searchTerm, reportedExpenseIds]);
-
-  // Handle invoice number change for an expense
-  const handleInvoiceNumberChange = (expenseId: string, invoiceNumber: string) => {
-    setExpenseInvoiceMap(prev => ({
-      ...prev,
-      [expenseId]: invoiceNumber
-    }));
-  };
-
-  // Get invoice amount by invoice number
-  const getInvoiceAmount = (invoiceNumber: string) => {
-    if (!invoiceNumber) return 0;
-    
-    // Try exact match first
-    let invoice = invoiceHistory.find(inv => inv.invoiceNumber === invoiceNumber);
-    
-    // If not found, try case-insensitive match
-    if (!invoice) {
-      invoice = invoiceHistory.find(inv => 
-        inv.invoiceNumber.toLowerCase() === invoiceNumber.toLowerCase()
-      );
-    }
-    
-    // If still not found, try partial match (in case of extra spaces)
-    if (!invoice) {
-      invoice = invoiceHistory.find(inv => 
-        inv.invoiceNumber.trim() === invoiceNumber.trim()
-      );
-    }
-    
-    console.log('Looking for invoice:', invoiceNumber);
-    console.log('Found invoice:', invoice);
-    console.log('Available invoices:', invoiceHistory.map(inv => inv.invoiceNumber));
-    
-    return invoice ? invoice.total : 0;
-  };
+  }, [expenses, filterMonth, filterYear, searchTerm]);
 
   // Calculate profit/loss data for each expense
   const profitLossData = useMemo(() => {
     return filteredExpenses.map(expense => {
-      const invoiceNumber = expenseInvoiceMap[expense.id] || '';
-      const revenue = invoiceNumber ? getInvoiceAmount(invoiceNumber) : 0;
+      let revenue = 0;
+      let invoiceNumber = '';
+      let revenueStatus = 'No Invoice';
+      
+      // If expense has an invoice, find it
+      if (expense.hasInvoice) {
+        const invoice = findInvoiceForExpense(expense);
+        if (invoice) {
+          invoiceNumber = invoice.invoiceNumber;
+          
+          // If expense status is received, use invoice total as revenue
+          if (expense.status === 'received') {
+            revenue = invoice.total;
+            revenueStatus = 'Received';
+          } else {
+            // If expense status is pending, show as pending
+            revenueStatus = 'Pending';
+          }
+        } else {
+          // Has invoice flag but no matching invoice found
+          revenueStatus = expense.status || 'pending';
+        }
+      } else {
+        // If no invoice, show expense status
+        revenueStatus = expense.status || 'pending';
+      }
+      
       const profit = revenue - expense.amount;
       
       return {
         ...expense,
         invoiceNumber,
         revenue,
+        revenueStatus,
         profit
       };
     });
-  }, [filteredExpenses, expenseInvoiceMap, invoiceHistory]);
+  }, [filteredExpenses, invoiceHistory]);
 
   // Sort data
   const sortedData = useMemo(() => {
@@ -191,6 +173,61 @@ const ProfitLoss = () => {
     );
   }, [sortedData]);
 
+  // Save profit/loss report to database
+  const handleSaveReport = async () => {
+    try {
+      // Prepare report data
+      const reportData = sortedData.map(item => ({
+        expenseId: item.id,
+        clientName: item.clientName,
+        company: item.company,
+        description: item.description,
+        expenseAmount: item.amount,
+        invoiceNumber: item.invoiceNumber,
+        revenue: item.revenue,
+        profit: item.profit
+      }));
+      
+      // Determine period based on filters
+      const period: 'monthly' | 'yearly' = filterMonth !== 'all' ? 'monthly' : 'yearly';
+      const year = filterYear !== 'all' ? filterYear : new Date().getFullYear().toString();
+      
+      // Create report object that matches the ProfitLossReport interface
+      const report: any = {
+        period,
+        year,
+        revenue: totals.revenue,
+        expenses: totals.expenses,
+        profit: totals.profit,
+        reportData
+      };
+      
+      // Only add month property if it's not 'all'
+      if (filterMonth !== 'all') {
+        report.month = filterMonth;
+      }
+      
+      // Save to database
+      await addProfitLossReport(report);
+      
+      // Add notification
+      addNotification({
+        title: 'Profit/Loss Report Saved',
+        message: `Profit/Loss report for ${filterMonth !== 'all' ? filterMonth + ' ' : ''}${year} saved with total profit of ${new Intl.NumberFormat('en-IN', {
+          style: 'currency',
+          currency: 'INR',
+          minimumFractionDigits: 2
+        }).format(totals.profit)}`,
+        type: 'profit_loss_updated'
+      });
+      
+      toast.success('Profit/Loss report saved successfully!');
+    } catch (error: any) {
+      console.error('Error saving report:', error);
+      toast.error(`Failed to save report: ${error.message || 'Unknown error'}`);
+    }
+  };
+
   const toggleSort = (field: 'client' | 'revenue' | 'expenses' | 'profit') => {
     if (sortField === field) {
       setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
@@ -216,89 +253,6 @@ const ProfitLoss = () => {
     }
   };
 
-  // Save invoice number and amount for an expense
-  const handleSaveInvoice = (expenseId: string, invoiceNumber: string) => {
-    if (!invoiceNumber) {
-      toast.error('Please enter an invoice number first');
-      return;
-    }
-    
-    const amount = getInvoiceAmount(invoiceNumber);
-    if (amount <= 0) {
-      toast.error('Invoice not found or has invalid amount');
-      return;
-    }
-    
-    setSavedInvoices(prev => ({
-      ...prev,
-      [expenseId]: { invoiceNumber, amount }
-    }));
-    
-    toast.success('Invoice saved successfully!');
-  };
-
-  // Save current profit/loss data as a report
-  const handleSaveReport = async () => {
-    try {
-      // Check if there are any expenses with invoice numbers
-      const expensesWithInvoices = sortedData.filter(item => item.invoiceNumber && item.invoiceNumber.trim() !== '');
-      
-      // If no expenses have invoice numbers, don't save the report
-      if (expensesWithInvoices.length === 0) {
-        toast.error('Cannot save report: No expenses have invoice numbers. Please enter invoice numbers for at least one expense.');
-        return;
-      }
-      
-      // Prepare report data
-      const reportData = sortedData.map(item => ({
-        expenseId: item.id,
-        clientName: item.clientName,
-        company: item.company,
-        description: item.description,
-        expenseAmount: item.amount,
-        invoiceNumber: item.invoiceNumber,
-        revenue: item.revenue,
-        profit: item.profit
-      }));
-      
-      // Determine period based on filters
-      const period: 'monthly' | 'yearly' = filterMonth !== 'all' ? 'monthly' : 'yearly';
-      const year = filterYear !== 'all' ? filterYear : new Date().getFullYear().toString();
-      
-      // Create report object that matches the ProfitLossReport interface
-      // Only include month if it's not 'all'
-      const report: Omit<ProfitLossReport, 'id' | 'createdAt'> = {
-        period,
-        year,
-        revenue: totals.revenue,
-        expenses: totals.expenses,
-        profit: totals.profit,
-        reportData
-      };
-      
-      // Only add month property if it's not 'all'
-      if (filterMonth !== 'all') {
-        report.month = filterMonth;
-      }
-      
-      // Save to database
-      await addProfitLossReport(report);
-      
-      // Update last saved report to filter out expenses with invoice numbers
-      const createdReport: ProfitLossReport = {
-        ...report,
-        id: Date.now().toString(), // Temporary ID, will be replaced by actual ID from DB
-        createdAt: new Date().toISOString()
-      } as ProfitLossReport;
-      setLastSavedReport(createdReport);
-      
-      toast.success('Profit/Loss report saved successfully!');
-    } catch (error: any) {
-      console.error('Error saving report:', error);
-      toast.error(`Failed to save report: ${error.message || 'Unknown error'}`);
-    }
-  };
-
   const formatAmount = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
@@ -310,464 +264,234 @@ const ProfitLoss = () => {
   // Get status icon and color
   const getStatusIcon = (profit: number) => {
     if (profit > 0) {
-      return <CheckCircle className="w-4 h-4 text-green-500" />;
+      return <CheckCircle className="w-4 h-4 text-primary" />;
     } else if (profit < 0) {
-      return <XCircle className="w-4 h-4 text-red-500" />;
+      return <XCircle className="w-4 h-4 text-destructive" />;
     }
-    return <CheckCircle className="w-4 h-4 text-gray-500" />;
-  };
-
-  // Filter saved reports by month and year
-  const filteredReports = useMemo(() => {
-    return profitLossReports.filter(report => {
-      if (filterMonth !== 'all' && report.month !== filterMonth) {
-        return false;
-      }
-      
-      if (filterYear !== 'all' && report.year !== filterYear) {
-        return false;
-      }
-      
-      return true;
-    });
-  }, [profitLossReports, filterMonth, filterYear]);
-
-  // Handle delete report
-  const handleDeleteReport = async () => {
-    if (!reportToDelete) return;
-    
-    setIsDeleting(true);
-    try {
-      await deleteProfitLossReport(reportToDelete.id);
-      toast.success('Report deleted successfully!');
-      setIsDeleteDialogOpen(false);
-      setReportToDelete(null);
-    } catch (error: any) {
-      console.error('Error deleting report:', error);
-      toast.error(`Failed to delete report: ${error.message || 'Unknown error'}`);
-    } finally {
-      setIsDeleting(false);
-    }
-  };
-
-  // Open delete confirmation dialog
-  const openDeleteDialog = (report: ProfitLossReport) => {
-    setReportToDelete({
-      id: report.id,
-      period: report.period,
-      month: report.month,
-      year: report.year
-    });
-    setIsDeleteDialogOpen(true);
-  };
-
-  // Close delete confirmation dialog
-  const closeDeleteDialog = () => {
-    setIsDeleteDialogOpen(false);
-    setReportToDelete(null);
+    return <CheckCircle className="w-4 h-4 text-muted-foreground" />;
   };
 
   return (
-    <Card>
+    <Card className="w-full">
       <CardHeader>
         <div className="flex flex-col gap-4">
           <div className="flex items-center justify-between flex-wrap gap-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-accent/10 rounded-lg">
-                <ArrowUpDown className="w-5 h-5 text-accent" />
+              <div className="p-2 bg-primary/10 rounded-lg">
+                <ArrowUpDown className="w-5 h-5 text-primary" />
               </div>
               <div>
-                <CardTitle>Profit & Loss</CardTitle>
-                <CardDescription>
-                  Link expenses to invoices for profit calculation
+                <CardTitle className="text-lg">Profit & Loss</CardTitle>
+                <CardDescription className="text-sm">
+                  Automatic profit calculation from invoices and expense status
                 </CardDescription>
               </div>
             </div>
-            <Button 
-              onClick={handleRefresh}
-              variant="outline" 
-              size="sm"
-            >
-              <RefreshCw className="w-4 h-4 mr-2" />
-              Refresh Data
-            </Button>
+            <div className="flex gap-2 flex-wrap">
+              <Button 
+                onClick={handleRefresh}
+                variant="outline" 
+                size="sm"
+                className="text-sm"
+              >
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Refresh Data
+              </Button>
+              <Button 
+                onClick={handleSaveReport}
+                size="sm"
+                className="text-sm"
+              >
+                Save Report
+              </Button>
+            </div>
           </div>
           
-          {/* Tabs for current data and saved reports */}
-          <div className="flex border-b">
-            <Button
-              variant={activeTab === 'current' ? 'default' : 'ghost'}
-              className="rounded-b-none"
-              onClick={() => setActiveTab('current')}
-            >
-              Current Data
-            </Button>
-            <Button
-              variant={activeTab === 'saved' ? 'default' : 'ghost'}
-              className="rounded-b-none"
-              onClick={() => setActiveTab('saved')}
-            >
-              Saved Reports
-            </Button>
-          </div>
-          
-          {/* Filter Section */}
-          <div className="flex flex-wrap gap-4 p-4 bg-muted/50 rounded-lg">
+          {/* Filter Section - Responsive */}
+          <div className="flex flex-wrap gap-3 p-3 bg-muted/50 rounded-lg">
             <div className="flex-1 min-w-[200px]">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
+                <input
                   placeholder="Search by client, company, or description..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 w-full p-2 border rounded text-sm"
                 />
               </div>
             </div>
             
-            <div className="w-40">
+            <div className="w-full sm:w-40">
               <Select value={filterMonth} onValueChange={setFilterMonth}>
-                <SelectTrigger>
+                <SelectTrigger className="text-sm">
                   <SelectValue placeholder="All months" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All months</SelectItem>
                   {uniqueMonths.map(month => (
-                    <SelectItem key={month} value={month}>{month}</SelectItem>
+                    <SelectItem key={month} value={month} className="text-sm">{month}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             
-            <div className="w-40">
+            <div className="w-full sm:w-40">
               <Select value={filterYear} onValueChange={setFilterYear}>
-                <SelectTrigger>
+                <SelectTrigger className="text-sm">
                   <SelectValue placeholder="All years" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All years</SelectItem>
                   {uniqueYears.map(year => (
-                    <SelectItem key={year} value={year}>{year}</SelectItem>
+                    <SelectItem key={year} value={year} className="text-sm">{year}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             
             <div className="flex items-center gap-2">
-              <Button variant="outline" onClick={clearFilters} className="gap-2">
+              <Button variant="outline" onClick={clearFilters} className="gap-2 text-sm">
                 <Filter className="w-4 h-4" />
-                Clear Filters
+                <span className="hidden sm:inline">Clear Filters</span>
               </Button>
-              
-              {activeTab === 'current' && (
-                <Button 
-                  onClick={handleSaveReport} 
-                  className="gap-2"
-                  disabled={sortedData.filter(item => item.invoiceNumber && item.invoiceNumber.trim() !== '').length === 0}
-                  title={sortedData.filter(item => item.invoiceNumber && item.invoiceNumber.trim() !== '').length === 0 ? "Enter invoice numbers for at least one expense to save report" : "Save current report"}
-                >
-                  <Save className="w-4 h-4" />
-                  Save Report
-                </Button>
-              )}
             </div>
           </div>
         </div>
       </CardHeader>
       
       <CardContent>
-        {activeTab === 'current' ? (
-          <>
-            <div className="border rounded-lg overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Client Name</TableHead>
-                    <TableHead>Company</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => toggleSort('expenses')}
-                        className="gap-1 hover:bg-transparent w-full justify-end"
-                      >
-                        Expense Amount
-                        <ArrowUpDown className="w-3 h-3" />
-                      </Button>
-                    </TableHead>
-                    <TableHead>Invoice Number</TableHead>
-                    <TableHead className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => toggleSort('revenue')}
-                        className="gap-1 hover:bg-transparent w-full justify-end"
-                      >
-                        Revenue
-                        <ArrowUpDown className="w-3 h-3" />
-                      </Button>
-                    </TableHead>
-                    <TableHead className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => toggleSort('profit')}
-                        className="gap-1 hover:bg-transparent w-full justify-end"
-                      >
-                        Profit/Loss
-                        <ArrowUpDown className="w-3 h-3" />
-                      </Button>
-                    </TableHead>
-                    <TableHead className="text-center">Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {sortedData.length > 0 ? (
-                    <>
-                      {sortedData.map((item) => (
-                        <TableRow key={item.id}>
-                          <TableCell className="font-medium">{item.clientName || 'N/A'}</TableCell>
-                          <TableCell>{item.company || 'N/A'}</TableCell>
-                          <TableCell>{item.description}</TableCell>
-                          <TableCell className="text-right">{formatAmount(item.amount)}</TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <Input
-                                type="text"
-                                placeholder="Enter invoice number"
-                                value={item.invoiceNumber}
-                                onChange={(e) => handleInvoiceNumberChange(item.id, e.target.value)}
-                                className="w-32"
-                              />
-                              {item.invoiceNumber && (
-                                <div className={`w-3 h-3 rounded-full ${getInvoiceAmount(item.invoiceNumber) > 0 ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                              )}
-                              <Button 
-                                variant="outline" 
-                                size="sm" 
-                                onClick={() => handleSaveInvoice(item.id, item.invoiceNumber)}
-                                className={`p-2 h-8 ${savedInvoices[item.id] ? 'bg-green-100 border-green-500' : ''}`}
-                                title="Save invoice"
-                              >
-                                <Save className="w-3 h-3" />
-                              </Button>
-                              <Button 
-                                variant="outline" 
-                                size="sm" 
-                                onClick={handleRefresh}
-                                className="p-2 h-8"
-                                title="Refresh data"
-                              >
-                                <RefreshCw className="w-3 h-3" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right">{formatAmount(item.revenue)}</TableCell>
-                          <TableCell className={`text-right font-medium ${item.profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                            {formatAmount(item.profit)}
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <div className="flex justify-center">
-                              {getStatusIcon(item.profit)}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                      <TableRow className="bg-muted font-bold">
-                        <TableCell colSpan={3}>Total</TableCell>
-                        <TableCell className="text-right">{formatAmount(totals.expenses)}</TableCell>
-                        <TableCell></TableCell>
-                        <TableCell className="text-right">{formatAmount(totals.revenue)}</TableCell>
-                        <TableCell className={`text-right ${totals.profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          {formatAmount(totals.profit)}
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <div className="flex justify-center">
-                            {getStatusIcon(totals.profit)}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    </>
-                  ) : (
-                    <TableRow>
-                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                        No expenses found
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-            
-            {/* Saved Invoices Section */}
-            {Object.keys(savedInvoices).length > 0 && (
-              <div className="mt-6 p-4 bg-muted rounded-lg">
-                <h3 className="font-medium mb-2">Saved Invoices</h3>
-                <div className="border rounded-lg overflow-hidden">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Expense Description</TableHead>
-                        <TableHead>Client Name</TableHead>
-                        <TableHead>Invoice Number</TableHead>
-                        <TableHead className="text-right">Amount</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {Object.entries(savedInvoices).map(([expenseId, invoiceData]) => {
-                        const expense = expenses.find(exp => exp.id === expenseId);
-                        return (
-                          <TableRow key={expenseId}>
-                            <TableCell>{expense?.description || 'N/A'}</TableCell>
-                            <TableCell>{expense?.clientName || 'N/A'}</TableCell>
-                            <TableCell>{invoiceData.invoiceNumber}</TableCell>
-                            <TableCell className="text-right">{formatAmount(invoiceData.amount)}</TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </div>
-              </div>
-            )}
-            
-            <div className="mt-6 p-4 bg-muted rounded-lg">
-              <h3 className="font-medium mb-2">Profit & Loss Summary</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-white p-3 rounded border">
-                  <p className="text-sm text-muted-foreground">Total Revenue</p>
-                  <p className="text-lg font-bold text-green-600">{formatAmount(totals.revenue)}</p>
-                </div>
-                <div className="bg-white p-3 rounded border">
-                  <p className="text-sm text-muted-foreground">Total Expenses</p>
-                  <p className="text-lg font-bold text-red-600">{formatAmount(totals.expenses)}</p>
-                </div>
-                <div className={`bg-white p-3 rounded border ${totals.profit >= 0 ? 'border-green-500' : 'border-red-500'}`}>
-                  <p className="text-sm text-muted-foreground">Net Profit/Loss</p>
-                  <p className={`text-lg font-bold ${totals.profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {formatAmount(totals.profit)}
-                  </p>
-                </div>
-              </div>
-              <div className="mt-4 text-sm text-muted-foreground">
-                <p><strong>How it works:</strong> Enter invoice numbers for each expense to link them to revenue. Profit/Loss = Revenue - Expense.</p>
-                <p className="mt-2 text-blue-600"><strong>Note:</strong> Reports can only be saved when at least one expense has an invoice number.</p>
-              </div>
-            </div>
-          </>
-        ) : (
-          // Saved Reports Tab
-          <div className="border rounded-lg overflow-hidden">
-            <Table>
+        <div className="border rounded-lg overflow-hidden">
+          <div className="overflow-x-auto">
+            <Table className="text-sm">
               <TableHeader>
                 <TableRow>
-                  <TableHead>Period</TableHead>
-                  <TableHead>Month</TableHead>
-                  <TableHead>Year</TableHead>
-                  <TableHead>Client/Company</TableHead>
-                  <TableHead className="text-right">Revenue</TableHead>
-                  <TableHead className="text-right">Expenses</TableHead>
-                  <TableHead className="text-right">Profit/Loss</TableHead>
-                  <TableHead className="text-center">Status</TableHead>
-                  <TableHead>Date Saved</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead className="text-xs">Client Name</TableHead>
+                  <TableHead className="text-xs">Company</TableHead>
+                  <TableHead className="text-xs">Description</TableHead>
+                  <TableHead className="text-right text-xs">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => toggleSort('expenses')}
+                      className="gap-1 hover:bg-transparent w-full justify-end p-1"
+                    >
+                      <span className="hidden md:inline">Expense Amount</span>
+                      <span className="md:hidden">Amt</span>
+                      <ArrowUpDown className="w-3 h-3" />
+                    </Button>
+                  </TableHead>
+                  <TableHead className="text-xs">Invoice</TableHead>
+                  <TableHead className="text-right text-xs">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => toggleSort('revenue')}
+                      className="gap-1 hover:bg-transparent w-full justify-end p-1"
+                    >
+                      <span className="hidden md:inline">Revenue</span>
+                      <span className="md:hidden">Rev</span>
+                      <ArrowUpDown className="w-3 h-3" />
+                    </Button>
+                  </TableHead>
+                  <TableHead className="text-right text-xs">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => toggleSort('profit')}
+                      className="gap-1 hover:bg-transparent w-full justify-end p-1"
+                    >
+                      <span className="hidden md:inline">Profit/Loss</span>
+                      <span className="md:hidden">P/L</span>
+                      <ArrowUpDown className="w-3 h-3" />
+                    </Button>
+                  </TableHead>
+                  <TableHead className="text-center text-xs">Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredReports.length > 0 ? (
-                  filteredReports.map((report) => (
-                    <TableRow key={report.id}>
-                      <TableCell className="font-medium capitalize">{report.period}</TableCell>
-                      <TableCell>{report.month || 'N/A'}</TableCell>
-                      <TableCell>{report.year}</TableCell>
-                      <TableCell>
-                        {report.reportData && report.reportData.length > 0 ? (
-                          <div className="flex flex-col gap-1">
-                            {report.reportData.slice(0, 3).map((data, index) => (
-                              <span key={index} className="text-sm">
-                                {data.clientName || data.company || 'N/A'}
-                              </span>
-                            ))}
-                            {report.reportData.length > 3 && (
-                              <span className="text-xs text-muted-foreground">
-                                +{report.reportData.length - 3} more
-                              </span>
-                            )}
+                {sortedData.length > 0 ? (
+                  <>
+                    {sortedData.map((item) => (
+                      <TableRow key={item.id}>
+                        <TableCell className="font-medium text-foreground text-xs">{item.clientName || 'N/A'}</TableCell>
+                        <TableCell className="text-foreground text-xs">{item.company || 'N/A'}</TableCell>
+                        <TableCell className="text-foreground text-xs max-w-[150px] truncate">{item.description}</TableCell>
+                        <TableCell className="text-right text-foreground text-xs">{formatAmount(item.amount)}</TableCell>
+                        <TableCell className="text-foreground text-xs max-w-[100px] truncate">
+                          {item.invoiceNumber || 'No Invoice'}
+                        </TableCell>
+                        <TableCell className="text-right text-xs">
+                          {item.revenueStatus === 'Received' ? (
+                            <span className="text-primary font-medium">{formatAmount(item.revenue)}</span>
+                          ) : (
+                            <span className={item.revenueStatus === 'Pending' ? 'text-yellow-600' : 
+                                     item.revenueStatus === 'received' ? 'text-primary' : 
+                                     item.revenueStatus === 'pending' ? 'text-yellow-600' : 
+                                     'text-muted-foreground'}>
+                              {item.revenueStatus.charAt(0).toUpperCase() + item.revenueStatus.slice(1)}
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell className={`text-right font-medium text-xs ${item.profit >= 0 ? 'text-primary' : 'text-destructive'}`}>
+                          {formatAmount(item.profit)}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <div className="flex justify-center">
+                            {getStatusIcon(item.profit)}
                           </div>
-                        ) : 'No data'}
-                      </TableCell>
-                      <TableCell className="text-right text-green-600">{formatAmount(report.revenue)}</TableCell>
-                      <TableCell className="text-right text-red-600">{formatAmount(report.expenses)}</TableCell>
-                      <TableCell className={`text-right font-medium ${report.profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        {formatAmount(report.profit)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    <TableRow className="bg-muted font-bold">
+                      <TableCell colSpan={3} className="text-xs">Total</TableCell>
+                      <TableCell className="text-right text-foreground text-xs">{formatAmount(totals.expenses)}</TableCell>
+                      <TableCell></TableCell>
+                      <TableCell className="text-right text-foreground text-xs">{formatAmount(totals.revenue)}</TableCell>
+                      <TableCell className={`text-right text-xs ${totals.profit >= 0 ? 'text-primary' : 'text-destructive'}`}>
+                        {formatAmount(totals.profit)}
                       </TableCell>
                       <TableCell className="text-center">
                         <div className="flex justify-center">
-                          {getStatusIcon(report.profit)}
+                          {getStatusIcon(totals.profit)}
                         </div>
                       </TableCell>
-                      <TableCell>
-                        {new Date(report.createdAt).toLocaleDateString()}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button 
-                          variant="destructive" 
-                          size="sm"
-                          onClick={() => openDeleteDialog(report)}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </TableCell>
                     </TableRow>
-                  ))
+                  </>
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
-                      No saved reports found
+                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground text-sm">
+                      No expenses found
                     </TableCell>
                   </TableRow>
                 )}
               </TableBody>
             </Table>
-            
-            {filteredReports.length > 0 && (
-              <div className="mt-6 p-4 bg-muted rounded-lg">
-                <h3 className="font-medium mb-2">Summary of Saved Reports</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="bg-white p-3 rounded border">
-                    <p className="text-sm text-muted-foreground">Total Saved Reports</p>
-                    <p className="text-lg font-bold">{filteredReports.length}</p>
-                  </div>
-                  <div className="bg-white p-3 rounded border">
-                    <p className="text-sm text-muted-foreground">Average Revenue</p>
-                    <p className="text-lg font-bold text-green-600">
-                      {formatAmount(filteredReports.reduce((sum, report) => sum + report.revenue, 0) / filteredReports.length)}
-                    </p>
-                  </div>
-                  <div className="bg-white p-3 rounded border">
-                    <p className="text-sm text-muted-foreground">Average Profit</p>
-                    <p className={`text-lg font-bold ${filteredReports.reduce((sum, report) => sum + report.profit, 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {formatAmount(filteredReports.reduce((sum, report) => sum + report.profit, 0) / filteredReports.length)}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
-        )}
+        </div>
+        
+        <div className="mt-4 p-3 bg-muted rounded-lg">
+          <h3 className="font-medium mb-2 text-sm">Profit & Loss Summary</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="bg-white p-3 rounded border">
+              <p className="text-xs text-muted-foreground">Total Revenue</p>
+              <p className="text-base font-bold text-primary">{formatAmount(totals.revenue)}</p>
+            </div>
+            <div className="bg-white p-3 rounded border">
+              <p className="text-xs text-muted-foreground">Total Expenses</p>
+              <p className="text-base font-bold text-destructive">{formatAmount(totals.expenses)}</p>
+            </div>
+            <div className={`bg-white p-3 rounded border ${totals.profit >= 0 ? 'border-primary' : 'border-destructive'}`}>
+              <p className="text-xs text-muted-foreground">Net Profit/Loss</p>
+              <p className={`text-base font-bold ${totals.profit >= 0 ? 'text-primary' : 'text-destructive'}`}>
+                {formatAmount(totals.profit)}
+              </p>
+            </div>
+          </div>
+          <div className="mt-3 text-xs text-muted-foreground">
+            <p><strong>How it works:</strong> Revenue is calculated based on expense status. When an expense is marked as "received", the associated invoice amount is added to revenue. Profit/Loss = Revenue - Expense.</p>
+          </div>
+        </div>
       </CardContent>
-      
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog
-        isOpen={isDeleteDialogOpen}
-        onClose={closeDeleteDialog}
-        onConfirm={handleDeleteReport}
-        title="Delete Report"
-        description={`Are you sure you want to delete the ${reportToDelete?.period} report for ${reportToDelete?.month ? reportToDelete.month + ' ' : ''}${reportToDelete?.year}? This action cannot be undone.`}
-        confirmText="Delete Report"
-        isDeleting={isDeleting}
-      />
     </Card>
   );
 };

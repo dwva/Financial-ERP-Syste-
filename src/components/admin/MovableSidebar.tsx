@@ -64,6 +64,7 @@ const MovableSidebar = ({
   const menuItems = [
     { id: 'analytics', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'expenses', label: 'All Expenses', icon: Wallet },
+    { id: 'expense-overview', label: 'Expenses Overview', icon: FileText },
     { id: 'users', label: 'User Management', icon: Users },
     { id: 'expense-status', label: 'Expense Status', icon: FileText },
     { id: 'overdue-expenses', label: 'Overdue Expenses', icon: AlertTriangle },
@@ -159,45 +160,45 @@ const MovableSidebar = ({
         />
       )}
       
-      <div className="p-4 border-b border-grey-200 flex items-center justify-between">
+      <div className="p-3 border-b border-grey-200 flex items-center justify-between">
         {sidebarExpanded && (
-          <h1 className="text-lg font-semibold text-grey-800 font-body">Admin Dashboard</h1>
+          <h1 className="text-base font-semibold text-foreground font-body">Admin Dashboard</h1>
         )}
         <Button 
           variant="ghost" 
           size="sm"
           onClick={() => setSidebarExpanded(!sidebarExpanded)}
-          className="ml-auto"
+          className="ml-auto p-2"
         >
           {sidebarExpanded ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
         </Button>
       </div>
       
-      <nav className="mt-4 px-2 flex-1 overflow-y-auto">
+      <nav className="mt-3 px-2 flex-1 overflow-y-auto">
         {menuItems.map((item) => {
           const Icon = item.icon;
           return (
             <button
               key={item.id}
               onClick={() => setActiveSection(item.id)}
-              className={`w-full flex items-center px-3 py-2.5 text-left transition-all duration-300 rounded-xl mb-1 ${
+              className={`w-full flex items-center px-3 py-2 text-left transition-all duration-300 rounded-lg mb-1 ${
                 activeSection === item.id
-                  ? 'bg-violet-100 text-violet-700'
-                  : 'text-grey-600 hover:bg-grey-100'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-foreground hover:bg-muted'
               }`}
-              style={{ fontSize: '0.875rem' }}
+              style={{ fontSize: '0.8rem' }}
             >
               <Icon className="h-4 w-4 mr-3 flex-shrink-0" />
               {sidebarExpanded && (
                 <span className="flex items-center font-body truncate">
                   {item.label}
                   {item.id === 'notifications' && unreadCount > 0 && (
-                    <span className="ml-2 bg-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center flex-shrink-0">
+                    <span className="ml-2 bg-destructive text-destructive-foreground text-xs rounded-full h-4 w-4 flex items-center justify-center flex-shrink-0">
                       {unreadCount}
                     </span>
                   )}
                   {item.id === 'overdue-expenses' && overdueCount > 0 && (
-                    <span className="ml-2 bg-orange-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center flex-shrink-0">
+                    <span className="ml-2 bg-destructive text-destructive-foreground text-xs rounded-full h-4 w-4 flex items-center justify-center flex-shrink-0">
                       {overdueCount}
                     </span>
                   )}
@@ -208,29 +209,35 @@ const MovableSidebar = ({
         })}
       </nav>
       
-      <div className="p-4 border-t border-grey-200">
-        {/* Admin Info */}
-        <div className="flex items-center gap-2 mb-3 p-2 bg-grey-100 rounded-xl">
-          <Avatar className="h-8 w-8 flex-shrink-0">
-            <AvatarFallback className="text-xs">{getUserInitials(user?.email)}</AvatarFallback>
+      {/* User Profile and Logout */}
+      <div className="p-3 border-t border-grey-200">
+        <div className="flex items-center gap-2 mb-2">
+          <Avatar className="h-8 w-8">
+            <AvatarFallback className="bg-primary text-primary-foreground text-xs">
+              {getUserInitials(user?.email)}
+            </AvatarFallback>
           </Avatar>
           {sidebarExpanded && (
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium truncate font-body">{user?.email || 'Admin User'}</p>
-              <p className="text-xs text-grey-500 font-body">Administrator</p>
+            <div className="font-body">
+              <p className="text-xs font-medium text-foreground truncate">
+                {user?.email ? user.email.split('@')[0] : 'Admin'}
+              </p>
+              <p className="text-xs text-muted-foreground">Administrator</p>
             </div>
           )}
         </div>
         
-        {/* Logout Button */}
-        <Button 
-          onClick={onLogout}
-          variant="outline" 
-          className="w-full flex items-center justify-center rounded-xl text-xs font-body py-2"
-        >
-          <LogOut className="h-3 w-3 mr-2" />
-          {sidebarExpanded ? 'Logout' : ''}
-        </Button>
+        {sidebarExpanded && (
+          <Button 
+            variant="outline" 
+            onClick={onLogout}
+            className="w-full flex items-center gap-2 justify-start text-xs p-2"
+            size="sm"
+          >
+            <LogOut className="h-4 w-4" />
+            <span>Logout</span>
+          </Button>
+        )}
       </div>
     </div>
   );

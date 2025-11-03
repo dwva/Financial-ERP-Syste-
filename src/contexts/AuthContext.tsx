@@ -44,39 +44,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Listen for auth state changes
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
-      if (firebaseUser) {
-        // Determine if user is admin based on email or status
-        const isAdmin = firebaseUser.email === 'admin@company.com' || 
-                       firebaseUser.email === 'adminxyz@gmail.com';
-        
-        // Check if user has admin status in Firestore
-        let hasAdminStatus = isAdmin;
-        if (!isAdmin) {
-          try {
-            const employeesCollection = collection(db, 'employees');
-            const q = query(employeesCollection, where('email', '==', firebaseUser.email));
-            const querySnapshot = await getDocs(q);
-            
-            if (!querySnapshot.empty) {
-              const userDoc = querySnapshot.docs[0];
-              const userData = userDoc.data() as EmployeeData;
-              hasAdminStatus = userData.status === 'admin';
-            }
-          } catch (error) {
-            console.error('Error checking admin status:', error);
-          }
-        }
-        
-        const userData: User = {
-          uid: firebaseUser.uid,
-          email: firebaseUser.email,
-          role: hasAdminStatus ? 'admin' : 'user'
-        };
-        
-        setUser(userData);
-      } else {
-        setUser(null);
-      }
+      // Instead of automatically setting the user based on Firebase auth state,
+      // we'll only set loading to false and let the login function handle user state
       setLoading(false);
     });
 
@@ -188,10 +157,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try {
           console.log('Attempting Firebase auth for admin user:', email);
           // Try to sign in with the found email and password
-          await signInWithEmailAndPassword(auth, email, password);
+          const userCredential = await signInWithEmailAndPassword(auth, email, password);
+          
+          // Determine if user is admin based on email or status
+          const isAdmin = userCredential.user.email === 'admin@company.com' || 
+                         userCredential.user.email === 'adminxyz@gmail.com';
+          
+          // Check if user has admin status in Firestore
+          let hasAdminStatus = isAdmin;
+          if (!isAdmin) {
+            try {
+              const employeesCollection = collection(db, 'employees');
+              const q = query(employeesCollection, where('email', '==', userCredential.user.email));
+              const querySnapshot = await getDocs(q);
+              
+              if (!querySnapshot.empty) {
+                const userDoc = querySnapshot.docs[0];
+                const userData = userDoc.data() as EmployeeData;
+                hasAdminStatus = userData.status === 'admin';
+              }
+            } catch (error) {
+              console.error('Error checking admin status:', error);
+            }
+          }
+          
+          const userData: User = {
+            uid: userCredential.user.uid,
+            email: userCredential.user.email,
+            role: hasAdminStatus ? 'admin' : 'user'
+          };
           
           // Store admin credentials
           setAdminCredentials(email, password);
+          setUser(userData);
           console.log('Admin login successful');
           
           return true;
@@ -206,7 +204,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // First, try Firebase Authentication for all users
         try {
           console.log('Attempting Firebase auth for user:', email);
-          await signInWithEmailAndPassword(auth, email, password);
+          const userCredential = await signInWithEmailAndPassword(auth, email, password);
+          
+          // Determine user role
+          let hasAdminStatus = false;
+          try {
+            const employeesCollection = collection(db, 'employees');
+            const q = query(employeesCollection, where('email', '==', email));
+            const querySnapshot = await getDocs(q);
+            
+            if (!querySnapshot.empty) {
+              const userDoc = querySnapshot.docs[0];
+              const userData = userDoc.data() as EmployeeData;
+              hasAdminStatus = userData.status === 'admin';
+            }
+          } catch (error) {
+            console.error('Error checking user status:', error);
+          }
+          
+          const userData: User = {
+            uid: userCredential.user.uid,
+            email: userCredential.user.email,
+            role: hasAdminStatus ? 'admin' : 'user'
+          };
+          
+          setUser(userData);
           console.log('Firebase auth successful for user:', email);
           return true;
         } catch (firebaseError: any) {

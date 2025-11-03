@@ -15,13 +15,13 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [showPasswordReset, setShowPasswordReset] = useState(false);
   const [userEmail, setUserEmail] = useState('');
-  const { login, user, resetPassword, findUserByEmailOrIdentifier } = useAuth();
+  const { login, user, loading: authLoading, resetPassword, findUserByEmailOrIdentifier } = useAuth();
   const navigate = useNavigate();
 
-  // Handle redirection after successful login
+  // Handle automatic redirection after successful login based on user role
   useEffect(() => {
     if (user) {
-      // Redirect based on user role
+      // Automatically redirect based on user role
       if (user.role === 'admin') {
         navigate('/admin', { replace: true });
       } else {
@@ -42,7 +42,7 @@ const Login = () => {
         // Clear the form fields
         setIdentifier('');
         setPassword('');
-        // Redirection will happen in the useEffect when user state changes
+        // Automatic redirection will happen in the useEffect when user state changes
       }
     } catch (error: any) {
       console.error('Login error:', error);
@@ -93,6 +93,18 @@ const Login = () => {
     }
   };
 
+  // If authentication is still loading, show a loading indicator
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500 mb-4"></div>
+          <p>Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
       <Card className="w-full max-w-md shadow-lg">
@@ -106,10 +118,8 @@ const Login = () => {
           <CardDescription className="text-center">
             Sign in to your account
           </CardDescription>
-          <CardDescription className="text-center text-sm text-green-600 font-medium mt-2">
-            You can sign in with your email, mobile number, or username
-          </CardDescription>
         </CardHeader>
+        
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">
             <div className="space-y-2">

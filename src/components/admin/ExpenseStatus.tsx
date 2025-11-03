@@ -328,6 +328,9 @@ const ExpenseStatus = () => {
                         const isNotReceived = (expense.status || 'pending') !== 'received';
                         const isOverdueExpense = isOverdue && isNotReceived;
                         
+                        // Check if expense has an associated invoice
+                        const hasInvoice = expense.hasInvoice;
+                        
                         const employee = employees.find(emp => emp.email === expense.userId);
                         return (
                           <TableRow key={expense.id} className={isOverdueExpense ? 'bg-orange-50' : ''}>
@@ -344,6 +347,11 @@ const ExpenseStatus = () => {
                                 {expense.description}
                                 {isOverdueExpense && (
                                   <AlertTriangle className="w-4 h-4 ml-2 text-orange-500" />
+                                )}
+                                {hasInvoice && (
+                                  <Badge variant="outline" className="ml-2 text-xs">
+                                    Invoiced
+                                  </Badge>
                                 )}
                               </div>
                             </TableCell>
@@ -370,18 +378,25 @@ const ExpenseStatus = () => {
                               {getStatusBadge(expense.status || 'pending')}
                             </TableCell>
                             <TableCell>
-                              <Select 
-                                value={expense.status || 'pending'} 
-                                onValueChange={(value) => handleStatusChange(expense.id, value)}
-                              >
-                                <SelectTrigger className="w-32">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="pending">Pending</SelectItem>
-                                  <SelectItem value="received">Received</SelectItem>
-                                </SelectContent>
-                              </Select>
+                              {/* Only show status dropdown if expense has an invoice */}
+                              {hasInvoice ? (
+                                <Select 
+                                  value={expense.status || 'pending'} 
+                                  onValueChange={(value) => handleStatusChange(expense.id, value)}
+                                >
+                                  <SelectTrigger className="w-32">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="pending">Pending</SelectItem>
+                                    <SelectItem value="received">Received</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              ) : (
+                                <div className="text-muted-foreground text-sm">
+                                  Not invoiced
+                                </div>
+                              )}
                             </TableCell>
                           </TableRow>
                         );

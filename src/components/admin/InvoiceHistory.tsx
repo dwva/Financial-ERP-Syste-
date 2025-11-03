@@ -4,7 +4,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useData } from '@/contexts/DataContext';
-import { Search, Eye, Trash2, ArrowLeft } from 'lucide-react';
+import { Search, Eye, Trash2, ArrowLeft, Copy } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'react-toastify';
 import AlertDialog from './AlertDialog'; // Added import
@@ -127,7 +127,23 @@ const InvoiceHistory = ({ onBackToGeneration }: InvoiceHistoryProps) => {
             <TableBody>
               {filteredInvoices.map((invoice) => (
                 <TableRow key={invoice.id}>
-                  <TableCell className="font-medium">{invoice.invoiceNumber}</TableCell>
+                  <TableCell className="font-medium">
+                    <div className="flex items-center gap-2">
+                      <span>{invoice.invoiceNumber}</span>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-6 w-6 p-0"
+                        onClick={() => {
+                          navigator.clipboard.writeText(invoice.invoiceNumber);
+                          toast.success('Invoice number copied to clipboard!');
+                        }}
+                        title="Copy invoice number"
+                      >
+                        <Copy className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  </TableCell>
                   <TableCell>{format(new Date(invoice.date), 'dd/MM/yyyy')}</TableCell>
                   <TableCell>{invoice.companyName}</TableCell>
                   <TableCell>{invoice.candidateName || '-'}</TableCell>
@@ -205,7 +221,21 @@ const InvoiceHistory = ({ onBackToGeneration }: InvoiceHistoryProps) => {
                       <h2 className="text-3xl font-bold text-gray-800">INVOICE</h2>
                       <div className="mt-4 text-sm">
                         <p className="font-semibold">Invoice Number:</p>
-                        <p className="text-lg">{selectedInvoice.invoiceNumber}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-lg">{selectedInvoice.invoiceNumber}</p>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-6 w-6 p-0"
+                            onClick={() => {
+                              navigator.clipboard.writeText(selectedInvoice.invoiceNumber);
+                              toast.success('Invoice number copied to clipboard!');
+                            }}
+                            title="Copy invoice number"
+                          >
+                            <Copy className="w-3 h-3" />
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </div>
