@@ -1,31 +1,117 @@
-import React, { useState, useEffect } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useState, useMemo } from 'react';
 import { useData } from '@/contexts/DataContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { 
+  AlertTriangle, 
+  Edit, 
+  Eye,
+  FileText, 
+  Image as ImageIcon,
+  X,
+  Download
+} from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { AlertTriangle, FileText, Image as ImageIcon, Eye, Edit } from 'lucide-react';
+import EditExpenseForm from './EditExpenseForm';
 import { toast } from 'react-toastify';
-import EditExpenseForm from '@/components/user/EditExpenseForm';
+
+// File viewer modal component
+const FileViewerModal = ({ 
+  isOpen, 
+  onClose, 
+  fileUrl, 
+  fileName 
+}: { 
+  isOpen: boolean; 
+  onClose: () => void; 
+  fileUrl: string; 
+  fileName: string; 
+}) => {
+  if (!isOpen) return null;
+
+  const isImage = fileName.match(/\.(jpg|jpeg|png|gif|bmp|webp)$/i);
+  const isPdf = fileName.match(/\.pdf$/i);
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] flex flex-col">
+        <div className="flex justify-between items-center p-4 border-b">
+          <h3 className="text-lg font-semibold truncate">{fileName}</h3>
+          <Button variant="ghost" size="sm" onClick={onClose}>
+            <X className="w-4 h-4" />
+          </Button>
+        </div>
+        <div className="flex-1 overflow-auto p-4">
+          {isImage ? (
+            <div className="flex justify-center">
+              <img 
+                src={fileUrl} 
+                alt={fileName} 
+                className="max-w-full max-h-[70vh] object-contain"
+              />
+            </div>
+          ) : isPdf ? (
+            <div className="flex justify-center">
+              <iframe 
+                src={fileUrl} 
+                className="w-full h-[70vh]"
+                title={fileName}
+              />
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-[70vh] text-center">
+              <FileText className="w-16 h-16 text-gray-400 mb-4" />
+              <p className="mb-4">This file type cannot be previewed directly.</p>
+              <Button onClick={() => window.open(fileUrl, '_blank')}>
+                <Download className="w-4 h-4 mr-2" />
+                Download File
+              </Button>
+            </div>
+          )}
+        </div>
+        <div className="p-4 border-t flex justify-end">
+          <Button onClick={() => window.open(fileUrl, '_blank')}>
+            <Download className="w-4 h-4 mr-2" />
+            Download
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const OverdueExpenses = () => {
-  const { user } = useAuth();
   const { expenses, deleteExpense } = useData();
-  const [overdueExpenses, setOverdueExpenses] = useState<any[]>([]);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const { user } = useAuth();
   const [editingExpense, setEditingExpense] = useState<any>(null);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [fileViewerOpen, setFileViewerOpen] = useState<boolean>(false);
+  const [currentFile, setCurrentFile] = useState<{ url: string; name: string } | null>(null);
 
-  // Filter expenses for current user that are marked as overdue
-  useEffect(() => {
-    if (user?.email) {
-      const userOverdueExpenses = expenses.filter(expense => 
-        expense.userId === user.email && expense.overdue === true
-      );
-      setOverdueExpenses(userOverdueExpenses);
-    }
+  // Filter for user's overdue expenses
+  const overdueExpenses = useMemo(() => {
+    if (!user?.email) return [];
+    
+    const now = new Date();
+    return expenses
+      .filter(expense => 
+        expense.userId === user.email && 
+        expense.overdue
+      )
+      .filter(expense => {
+        // Check if the expense is actually overdue based on date and overdueDays
+        if (expense.overdueDays) {
+          const expenseDate = new Date(expense.date);
+          const dueDate = new Date(expenseDate);
+          dueDate.setDate(expenseDate.getDate() + parseInt(expense.overdueDays));
+          return dueDate < now;
+        }
+        
+        return true;
+      });
   }, [expenses, user?.email]);
 
   const getFileIcon = (fileName: string | null) => {
@@ -45,53 +131,62 @@ const OverdueExpenses = () => {
     return new Date(dateString).toLocaleDateString();
   };
 
-  const calculateDaysOverdue = (dateString: string, overdueDays: string) => {
-    // If overdueDays is provided, calculate based on that
-    if (overdueDays && !isNaN(parseInt(overdueDays))) {
-      const dueDate = new Date(dateString);
-      dueDate.setDate(dueDate.getDate() + parseInt(overdueDays));
-      const today = new Date();
-      const diffTime = Math.max(today.getTime() - dueDate.getTime(), 0); // Ensure non-negative
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      return diffDays;
+  const calculateDaysOverdue = (dateString: string, overdueDays: string | undefined) => {
+    const expenseDate = new Date(dateString);
+    let dueDate = new Date(expenseDate);
+    
+    if (overdueDays) {
+      dueDate.setDate(expenseDate.getDate() + parseInt(overdueDays));
     }
     
-    // Fallback to original calculation
-    const expenseDate = new Date(dateString);
     const today = new Date();
-    const diffTime = Math.abs(today.getTime() - expenseDate.getTime());
+    const diffTime = today.getTime() - dueDate.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays;
+    
+    return diffDays > 0 ? diffDays : 0;
   };
 
-  const handleDeleteExpense = async (expenseId: string) => {
+  const handleEditExpense = (expense: any) => {
+    setEditingExpense(expense);
+  };
+
+  const handleEditCancel = () => {
+    setEditingExpense(null);
+  };
+
+  const handleEditSuccess = () => {
+    setEditingExpense(null);
+    toast.success('Expense updated successfully');
+  };
+
+  const handleDeleteExpense = async (id: string) => {
+    setDeletingId(id);
     try {
-      setDeletingId(expenseId);
-      await deleteExpense(expenseId);
-      toast.success('Expense deleted successfully!');
+      await deleteExpense(id);
+      toast.success('Expense deleted successfully');
     } catch (error) {
       console.error('Error deleting expense:', error);
-      toast.error('Failed to delete expense. Please try again.');
+      toast.error('Failed to delete expense');
     } finally {
       setDeletingId(null);
     }
   };
 
-  const handleEditExpense = (expense: any) => {
-    setEditingExpense(expense);
-    setIsEditDialogOpen(true);
+  // Function to view a file in modal
+  const handleViewFile = async (fileUrl: string, fileName: string) => {
+    try {
+      // For expense attachments, they should be accessible via /admin-attachments/ path
+      // But for user expenses, we need to use /message-attachments/ path
+      const correctedFileUrl = fileUrl.replace('/admin-attachments/', '/message-attachments/');
+      setCurrentFile({ url: correctedFileUrl, name: fileName });
+      setFileViewerOpen(true);
+    } catch (error) {
+      console.error('Error preparing file for viewing:', error);
+      toast.error('Failed to view file. Please try downloading instead.');
+    }
   };
 
-  const handleEditCancel = () => {
-    setIsEditDialogOpen(false);
-    setEditingExpense(null);
-  };
-
-  const handleEditSuccess = () => {
-    setIsEditDialogOpen(false);
-    setEditingExpense(null);
-    toast.success('Expense updated successfully!');
-  };
+  if (!user) return null;
 
   return (
     <>
@@ -151,9 +246,25 @@ const OverdueExpenses = () => {
                         <TableCell>
                           <div className="flex items-center gap-2">
                             {getFileIcon(expense.fileName)}
-                            <span className="text-sm text-muted-foreground">
-                              {expense.fileName || 'No file'}
-                            </span>
+                            {expense.fileName ? (
+                              <div className="flex items-center gap-1">
+                                <span className="text-sm text-muted-foreground">
+                                  {expense.fileName}
+                                </span>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleViewFile(expense.file, expense.fileName!)}
+                                  className="h-6 w-6 p-0"
+                                >
+                                  <Eye className="w-3 h-3" />
+                                </Button>
+                              </div>
+                            ) : (
+                              <span className="text-sm text-muted-foreground">
+                                No file
+                              </span>
+                            )}
                           </div>
                         </TableCell>
                         <TableCell className="text-muted-foreground">
@@ -224,6 +335,14 @@ const OverdueExpenses = () => {
           onSave={handleEditSuccess}
         />
       )}
+      
+      {/* File Viewer Modal */}
+      <FileViewerModal 
+        isOpen={fileViewerOpen}
+        onClose={() => setFileViewerOpen(false)}
+        fileUrl={currentFile?.url || ''}
+        fileName={currentFile?.name || ''}
+      />
     </>
   );
 };

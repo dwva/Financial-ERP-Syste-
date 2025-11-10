@@ -1,33 +1,100 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
 import { useData } from '@/contexts/DataContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Button } from '@/components/ui/button';
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogDescription, 
-  DialogFooter, 
-  DialogHeader, 
-  DialogTitle 
-} from '@/components/ui/dialog';
-import { 
-  AlertDialog, 
-  AlertDialogAction, 
-  AlertDialogCancel, 
-  AlertDialogContent, 
-  AlertDialogDescription, 
-  AlertDialogFooter, 
-  AlertDialogHeader, 
-  AlertDialogTitle 
-} from '@/components/ui/alert-dialog';
-import { Receipt, FileText, Image as ImageIcon, Search, ArrowUpDown, Filter, Trash2, PlusCircle, Edit, Eye, ChevronDown, ChevronRight, Upload, Download } from 'lucide-react';
-import { toast } from 'react-toastify';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { 
+  Receipt, 
+  FileText, 
+  Image as ImageIcon, 
+  AlertTriangle, 
+  Download, 
+  Trash2, 
+  Search, 
+  Filter, 
+  Plus, 
+  Upload,
+  Eye,
+  X,
+  ArrowUpDown,
+  ChevronDown,
+  ChevronRight
+} from 'lucide-react';
+import { toast } from 'react-toastify';
+
+// File viewer modal component
+const FileViewerModal = ({ 
+  isOpen, 
+  onClose, 
+  fileUrl, 
+  fileName 
+}: { 
+  isOpen: boolean; 
+  onClose: () => void; 
+  fileUrl: string; 
+  fileName: string; 
+}) => {
+  if (!isOpen) return null;
+
+  const isImage = fileName.match(/\.(jpg|jpeg|png|gif|bmp|webp)$/i);
+  const isPdf = fileName.match(/\.pdf$/i);
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] flex flex-col">
+        <div className="flex justify-between items-center p-4 border-b">
+          <h3 className="text-lg font-semibold truncate">{fileName}</h3>
+          <Button variant="ghost" size="sm" onClick={onClose}>
+            <X className="w-4 h-4" />
+          </Button>
+        </div>
+        <div className="flex-1 overflow-auto p-4">
+          {isImage ? (
+            <div className="flex justify-center">
+              <img 
+                src={fileUrl} 
+                alt={fileName} 
+                className="max-w-full max-h-[70vh] object-contain"
+              />
+            </div>
+          ) : isPdf ? (
+            <div className="flex justify-center">
+              <iframe 
+                src={fileUrl} 
+                className="w-full h-[70vh]"
+                title={fileName}
+              />
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-[70vh] text-center">
+              <FileText className="w-16 h-16 text-gray-400 mb-4" />
+              <p className="mb-4">This file type cannot be previewed directly.</p>
+              <Button onClick={() => window.open(fileUrl, '_blank')}>
+                <Download className="w-4 h-4 mr-2" />
+                Download File
+              </Button>
+            </div>
+          )}
+        </div>
+        <div className="p-4 border-t flex justify-end">
+          <Button onClick={() => window.open(fileUrl, '_blank')}>
+            <Download className="w-4 h-4 mr-2" />
+            Download
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 // Add this interface for the expense form
 interface ExpenseForm {
@@ -80,7 +147,9 @@ const AllExpensesTableEnhanced = () => {
     overdueDays: ''
   });
   const [isSubmitting, setIsSubmitting] = useState(false); // Add this state to prevent duplicate submissions
-  
+  const [fileViewerOpen, setFileViewerOpen] = useState<boolean>(false);
+  const [currentFile, setCurrentFile] = useState<{ url: string; name: string } | null>(null);
+
   // Autocomplete states
   const [clientSearch, setClientSearch] = useState('');
   const [candidateSearch, setCandidateSearch] = useState('');
@@ -516,6 +585,19 @@ const AllExpensesTableEnhanced = () => {
     return <FileText className="w-4 h-4 text-muted-foreground" />;
   };
 
+  // Function to view a file in modal
+  const handleViewFile = async (fileUrl: string, fileName: string) => {
+    try {
+      // For expense attachments, they should be accessible via /admin-attachments/ path
+      const correctedFileUrl = fileUrl.replace('/message-attachments/', '/admin-attachments/');
+      setCurrentFile({ url: correctedFileUrl, name: fileName });
+      setFileViewerOpen(true);
+    } catch (error) {
+      console.error('Error preparing file for viewing:', error);
+      toast.error('Failed to view file. Please try downloading instead.');
+    }
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -526,7 +608,7 @@ const AllExpensesTableEnhanced = () => {
           </div>
           <div className="flex gap-2">
             <Button onClick={() => setIsAddExpenseDialogOpen(true)} size="sm">
-              <PlusCircle className="w-4 h-4 mr-2" />
+              <Plus className="w-4 h-4 mr-2" />
               Add Expense
             </Button>
           </div>
@@ -737,32 +819,7 @@ const AllExpensesTableEnhanced = () => {
                                     <Button
                                       variant="ghost"
                                       size="sm"
-                                      onClick={async () => {
-                                        // Try to open file in new tab for viewing
-                                        try {
-                                          // For expense attachments, they should be accessible via /admin-attachments/ path
-                                          // since they're stored in the "Expences attached file" folder
-                                          const fileUrl = expense.file.replace('/message-attachments/', '/admin-attachments/');
-                                          
-                                          // Fetch the file content
-                                          const response = await fetch(fileUrl);
-                                          if (!response.ok) {
-                                            throw new Error(`Failed to fetch file: ${response.status} ${response.statusText}`);
-                                          }
-                                          
-                                          const blob = await response.blob();
-                                          const blobUrl = URL.createObjectURL(blob);
-                                          
-                                          // Open in new tab
-                                          window.open(blobUrl, '_blank');
-                                          
-                                          // Revoke the blob URL after a delay to free memory
-                                          setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
-                                        } catch (error) {
-                                          console.error('Error opening file in new tab:', error);
-                                          toast.error('Failed to view file in new tab. Please try downloading instead.');
-                                        }
-                                      }}
+                                      onClick={() => handleViewFile(expense.file, expense.fileName!)}
                                       className="h-5 w-5 p-0"
                                     >
                                       <Eye className="w-2.5 h-2.5" />
@@ -1221,31 +1278,7 @@ const AllExpensesTableEnhanced = () => {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={async () => {
-                        // Try to open file in new tab for viewing
-                        try {
-                          // For expense attachments, they should be accessible via /admin-attachments/ path
-                          const fileUrl = selectedExpense.file.replace('/message-attachments/', '/admin-attachments/');
-                          
-                          // Fetch the file content
-                          const response = await fetch(fileUrl);
-                          if (!response.ok) {
-                            throw new Error(`Failed to fetch file: ${response.status} ${response.statusText}`);
-                          }
-                          
-                          const blob = await response.blob();
-                          const blobUrl = URL.createObjectURL(blob);
-                          
-                          // Open in new tab
-                          window.open(blobUrl, '_blank');
-                          
-                          // Revoke the blob URL after a delay to free memory
-                          setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
-                        } catch (error) {
-                          console.error('Error opening file in new tab:', error);
-                          toast.error('Failed to view file in new tab. Please try downloading instead.');
-                        }
-                      }}
+                      onClick={() => handleViewFile(selectedExpense.file, selectedExpense.fileName!)}
                       className="h-6 px-2 text-xs"
                     >
                       View
@@ -1312,6 +1345,14 @@ const AllExpensesTableEnhanced = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      
+      {/* File Viewer Modal */}
+      <FileViewerModal 
+        isOpen={fileViewerOpen}
+        onClose={() => setFileViewerOpen(false)}
+        fileUrl={currentFile?.url || ''}
+        fileName={currentFile?.name || ''}
+      />
     </Card>
   );
 };

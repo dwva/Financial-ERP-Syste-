@@ -70,7 +70,7 @@ const MyExpensesTable = () => {
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-accent/10 rounded-lg">
               <Receipt className="w-5 h-5 text-accent" />
@@ -80,7 +80,7 @@ const MyExpensesTable = () => {
               <CardDescription>Your expense history</CardDescription>
             </div>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
             <Button variant="outline" onClick={refreshData} className="gap-2">
               <ArrowUpDown className="w-4 h-4" />
               Refresh
@@ -94,101 +94,106 @@ const MyExpensesTable = () => {
       </CardHeader>
       <CardContent>
         <div className="border rounded-lg overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>ID</TableHead>
-                <TableHead>Amount</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead>Company</TableHead>
-                <TableHead>Sector</TableHead>
-                <TableHead>File</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {userExpenses.length === 0 ? (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
-                    No expenses recorded yet. Add your first expense above!
-                  </TableCell>
+                  <TableHead className="text-xs">ID</TableHead>
+                  <TableHead className="text-xs">Amount</TableHead>
+                  <TableHead className="text-xs">Description</TableHead>
+                  <TableHead className="text-xs hidden md:table-cell">Company</TableHead>
+                  <TableHead className="text-xs hidden md:table-cell">Sector</TableHead>
+                  <TableHead className="text-xs">File</TableHead>
+                  <TableHead className="text-xs hidden sm:table-cell">Date</TableHead>
+                  <TableHead className="text-xs">Status</TableHead>
+                  <TableHead className="text-xs">Actions</TableHead>
                 </TableRow>
-              ) : (
-                userExpenses.map((expense) => (
-                  <TableRow key={expense.id}>
-                    <TableCell className="font-mono text-xs">
-                      {expense.id.substring(0, 6)}...
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="secondary" className="font-semibold">
-                        {formatAmount(expense.amount)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{expense.description}</TableCell>
-                    <TableCell>{expense.company}</TableCell>
-                    <TableCell>{expense.sector}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        {getFileIcon(expense.fileName)}
-                        <span className="text-sm text-muted-foreground">
-                          {expense.fileName || 'No file'}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {new Date(expense.date).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell>
-                      {expense.overdue ? (
-                        <Badge variant="destructive" className="flex items-center gap-1">
-                          <AlertTriangle className="w-3 h-3" />
-                          Overdue
-                        </Badge>
-                      ) : (
-                        <Badge variant="default">Normal</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setEditingExpense(expense)}
-                        className="gap-2"
-                      >
-                        <Edit className="w-4 h-4" />
-                        Edit
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedExpense(expense);
-                          setViewExpenseDialogOpen(true);
-                        }}
-                        className="gap-2"
-                      >
-                        <Eye className="w-4 h-4" />
-                        View
-                      </Button>
-                      {user?.role === 'admin' && (
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => handleDeleteClick(expense.id)}
-                          className="gap-2"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                          Delete
-                        </Button>
-                      )}
+              </TableHeader>
+              <TableBody>
+                {userExpenses.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
+                      No expenses recorded yet. Add your first expense above!
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                ) : (
+                  userExpenses.map((expense) => (
+                    <TableRow key={expense.id}>
+                      <TableCell className="font-mono text-xs">
+                        {expense.id.substring(0, 6)}...
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="secondary" className="font-semibold text-xs">
+                          {formatAmount(expense.amount)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="max-w-[100px] truncate text-xs">{expense.description}</TableCell>
+                      <TableCell className="hidden md:table-cell text-xs">{expense.company}</TableCell>
+                      <TableCell className="hidden md:table-cell text-xs">{expense.sector}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          {getFileIcon(expense.fileName)}
+                          <span className="text-xs text-muted-foreground hidden sm:inline">
+                            {expense.fileName ? expense.fileName.substring(0, 10) + (expense.fileName.length > 10 ? '...' : '') : 'No file'}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground hidden sm:table-cell text-xs">
+                        {new Date(expense.date).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell>
+                        {expense.overdue ? (
+                          <Badge variant="destructive" className="flex items-center gap-1 text-xs">
+                            <AlertTriangle className="w-3 h-3" />
+                            <span className="hidden sm:inline">Overdue</span>
+                            <span className="sm:hidden">!</span>
+                          </Badge>
+                        ) : (
+                          <Badge variant="default" className="text-xs">Normal</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-1">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setEditingExpense(expense)}
+                            className="gap-1 h-8 px-2"
+                          >
+                            <Edit className="w-3 h-3" />
+                            <span className="hidden sm:inline">Edit</span>
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedExpense(expense);
+                              setViewExpenseDialogOpen(true);
+                            }}
+                            className="gap-1 h-8 px-2"
+                          >
+                            <Eye className="w-3 h-3" />
+                            <span className="hidden sm:inline">View</span>
+                          </Button>
+                          {user?.role === 'admin' && (
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => handleDeleteClick(expense.id)}
+                              className="gap-1 h-8 px-2"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                              <span className="hidden sm:inline">Delete</span>
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </div>
       </CardContent>
       
@@ -204,7 +209,7 @@ const MyExpensesTable = () => {
       
       {/* View Expense Dialog */}
       <AlertDialog open={viewExpenseDialogOpen} onOpenChange={setViewExpenseDialogOpen}>
-        <AlertDialogContent className="max-w-2xl">
+        <AlertDialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <AlertDialogHeader>
             <AlertDialogTitle>Expense Details</AlertDialogTitle>
             <AlertDialogDescription>
@@ -213,7 +218,7 @@ const MyExpensesTable = () => {
           </AlertDialogHeader>
           {selectedExpense && (
             <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground">Amount</p>
                   <p className="font-medium">{formatAmount(selectedExpense.amount)}</p>

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useData } from '@/contexts/DataContext';
-import { useNotification } from '@/contexts/NotificationContext'; // Add this import
+import { useNotification } from '@/contexts/NotificationContext';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -15,17 +15,17 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge'; // Add this import
+import { Badge } from '@/components/ui/badge';
 import AddExpenseForm from '@/components/user/AddExpenseForm';
 import MyExpensesTable from '@/components/user/MyExpensesTable';
 import MessagesPage from '@/components/user/MessagesPage';
-import OverdueExpenses from '@/components/user/OverdueExpenses'; // Add this import
+import OverdueExpenses from '@/components/user/OverdueExpenses';
 import { LogOut, Wallet, User, Calendar, Building, Hash, Camera, Mail, AlertTriangle } from 'lucide-react';
 
 const UserDashboard = () => {
   const { user, logout } = useAuth();
   const { employees, updateEmployee, refreshData } = useData();
-  const { unreadCount } = useNotification(); // Add this hook
+  const { unreadCount } = useNotification();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [name, setName] = useState('');
   const [sector, setSector] = useState('');
@@ -110,7 +110,7 @@ const UserDashboard = () => {
     <div className="min-h-screen bg-background">
       <header className="border-b bg-card">
         <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-primary rounded-xl">
                 <Wallet className="w-6 h-6 text-primary-foreground" />
@@ -229,7 +229,7 @@ const UserDashboard = () => {
                       </Select>
                     </div>
                     
-                    <div className="flex justify-end gap-2">
+                    <div className="flex flex-col sm:flex-row justify-end gap-2">
                       <Button type="button" variant="outline" onClick={() => setIsProfileOpen(false)}>
                         Cancel
                       </Button>
@@ -241,7 +241,7 @@ const UserDashboard = () => {
               
               <Button onClick={handleLogout} variant="outline" className="gap-2">
                 <LogOut className="w-4 h-4" />
-                Logout
+                <span className="hidden sm:inline">Logout</span>
               </Button>
             </div>
           </div>
@@ -250,18 +250,21 @@ const UserDashboard = () => {
 
       <main className="container mx-auto px-4 py-8">
         <Tabs defaultValue="expenses" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-1 sm:grid-cols-3">
             <TabsTrigger value="expenses" className="flex items-center gap-2">
               <Wallet className="w-4 h-4" />
-              My Expenses
+              <span className="hidden sm:inline">My Expenses</span>
+              <span className="sm:hidden">Expenses</span>
             </TabsTrigger>
             <TabsTrigger value="overdue" className="flex items-center gap-2">
               <AlertTriangle className="w-4 h-4" />
-              Overdue Expenses
+              <span className="hidden sm:inline">Overdue Expenses</span>
+              <span className="sm:hidden">Overdue</span>
             </TabsTrigger>
             <TabsTrigger value="messages" className="flex items-center gap-2 relative">
               <Mail className="w-4 h-4" />
-              Messages
+              <span className="hidden sm:inline">Messages</span>
+              <span className="sm:hidden">Msg</span>
               {unreadCount > 0 && (
                 <Badge 
                   variant="destructive" 

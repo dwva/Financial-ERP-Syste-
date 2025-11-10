@@ -7,30 +7,149 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useNotification } from '@/contexts/NotificationContext';
 import { Message } from '@/services/messageService';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Download, FileText, Mail, MailOpen, Clock, RefreshCw, Trash2 } from 'lucide-react';
+import { Download, FileText, Mail, MailOpen, Clock, RefreshCw, Trash2, Eye, X } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { downloadLocalFile } from '@/services/messageFileService';
+import { Timestamp } from 'firebase/firestore';
+
+// File viewer modal component
+const FileViewerModal = ({ 
+  isOpen, 
+  onClose, 
+  fileUrl, 
+  fileName 
+}: { 
+  isOpen: boolean; 
+  onClose: () => void; 
+  fileUrl: string; 
+  fileName: string; 
+}) => {
+  if (!isOpen) return null;
+
+  const isImage = fileName.match(/\.(jpg|jpeg|png|gif|bmp|webp)$/i);
+  const isPdf = fileName.match(/\.pdf$/i);
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] flex flex-col">
+        <div className="flex justify-between items-center p-4 border-b">
+          <h3 className="text-lg font-semibold truncate">{fileName}</h3>
+          <Button variant="ghost" size="sm" onClick={onClose}>
+            <X className="w-4 h-4" />
+          </Button>
+        </div>
+        <div className="flex-1 overflow-auto p-4">
+          {isImage ? (
+            <div className="flex justify-center">
+              <img 
+                src={fileUrl} 
+                alt={fileName} 
+                className="max-w-full max-h-[70vh] object-contain"
+              />
+            </div>
+          ) : isPdf ? (
+            <div className="flex justify-center">
+              <iframe 
+                src={fileUrl} 
+                className="w-full h-[70vh]"
+                title={fileName}
+              />
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-[70vh] text-center">
+              <FileText className="w-16 h-16 text-gray-400 mb-4" />
+              <p className="mb-4">This file type cannot be previewed directly.</p>
+              <Button onClick={() => window.open(fileUrl, '_blank')}>
+                <Download className="w-4 h-4 mr-2" />
+                Download File
+              </Button>
+            </div>
+          )}
+        </div>
+        <div className="p-4 border-t flex justify-end">
+          <Button onClick={() => window.open(fileUrl, '_blank')}>
+            <Download className="w-4 h-4 mr-2" />
+            Download
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const MessagesPage = () => {
   const { messages, markMessageAsRead, deleteMessage, loading: dataLoading } = useData();
   const { user } = useAuth();
-  const { markAsRead } = useNotification();
+  const { notifications, markAsRead } = useNotification();
   const [loading, setLoading] = useState<boolean>(true);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState<boolean>(false);
   const [messageToDelete, setMessageToDelete] = useState<{ id: string; subject: string } | null>(null);
   const [userMessages, setUserMessages] = useState<Message[]>([]);
   const [selectedMessages, setSelectedMessages] = useState<string[]>([]);
+  const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
+  const [fileViewerOpen, setFileViewerOpen] = useState<boolean>(false);
+  const [currentFile, setCurrentFile] = useState<{ url: string; name: string } | null>(null);
 
-  // Filter messages for the current user
+  // Helper function to convert timestamp to Date
+  const convertTimestampToDate = (timestamp: any): Date => {
+    if (!timestamp) return new Date();
+    try {
+      // Handle Firebase Timestamp objects
+      if (timestamp instanceof Timestamp) {
+        return timestamp.toDate();
+      }
+      // Handle objects with toDate method (like Firebase Timestamp)
+      if (timestamp.toDate && typeof timestamp.toDate === 'function') {
+        return timestamp.toDate();
+      }
+      // Handle regular Date objects
+      if (timestamp instanceof Date) {
+        return timestamp;
+      }
+      // Handle string timestamps
+      if (typeof timestamp === 'string') {
+        const date = new Date(timestamp);
+        if (!isNaN(date.getTime())) {
+          return date;
+        }
+      }
+      // Handle number timestamps (Unix timestamps)
+      if (typeof timestamp === 'number') {
+        const date = new Date(timestamp);
+        if (!isNaN(date.getTime())) {
+          return date;
+        }
+      }
+      return new Date();
+    } catch (error) {
+      console.error('Error converting timestamp:', error);
+      return new Date();
+    }
+  };
+
+  // Filter messages for the current user and sort by date
   useEffect(() => {
     if (messages.length > 0 && user?.email) {
-      const filteredMessages = messages.filter(msg => msg.receiverId === user.email);
+      const filteredMessages = messages
+        .filter(msg => msg.receiverId === user.email)
+        .sort((a, b) => {
+          // Convert timestamps to Date objects for comparison
+          const dateA = convertTimestampToDate(a.timestamp);
+          const dateB = convertTimestampToDate(b.timestamp);
+          
+          // Sort based on selected order
+          if (sortOrder === 'newest') {
+            return dateB.getTime() - dateA.getTime(); // Descending (newest first)
+          } else {
+            return dateA.getTime() - dateB.getTime(); // Ascending (oldest first)
+          }
+        });
       setUserMessages(filteredMessages);
       setLoading(false);
     } else if (messages.length === 0) {
       setLoading(false);
     }
-  }, [messages, user]);
+  }, [messages, user, sortOrder]);
 
   // Mark all messages as read when the user views the messages page
   useEffect(() => {
@@ -44,7 +163,16 @@ const MessagesPage = () => {
           await markMessageAsRead(message.id!);
           
           // Also mark any related notifications as read
-          // In a real implementation, you might want to find notifications by messageId
+          // Find notifications that correspond to this message and mark them as read
+          if (message.id) {
+            const relatedNotifications = notifications.filter(
+              notification => notification.messageId === message.id
+            );
+            
+            relatedNotifications.forEach(notification => {
+              markAsRead(notification.id);
+            });
+          }
         } catch (error) {
           console.error('Error marking message as read:', error);
         }
@@ -55,11 +183,21 @@ const MessagesPage = () => {
         toast.success(`Marked ${unreadMessages.length} message(s) as read`);
       }
     }
-  }, [userMessages, user?.email]);
+  }, [userMessages, user?.email, notifications, markAsRead]);
 
   const handleMarkAsRead = async (messageId: string) => {
     try {
       await markMessageAsRead(messageId);
+      
+      // Also mark any related notifications as read
+      const relatedNotifications = notifications.filter(
+        notification => notification.messageId === messageId
+      );
+      
+      relatedNotifications.forEach(notification => {
+        markAsRead(notification.id);
+      });
+      
       toast.success('Message marked as read');
     } catch (error) {
       console.error('Error marking message as read:', error);
@@ -70,13 +208,14 @@ const MessagesPage = () => {
   const formatTimestamp = (timestamp: any): string => {
     if (!timestamp) return 'Unknown';
     try {
-      const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+      const date = convertTimestampToDate(timestamp);
       return date.toLocaleString();
     } catch (error) {
       return 'Unknown';
     }
   };
 
+  // Calculate unread count correctly by filtering messages for current user
   const unreadCount = userMessages.filter(msg => !msg.read).length;
 
   // Function to download a file
@@ -111,6 +250,12 @@ const MessagesPage = () => {
         toast.error('Failed to download file');
       }
     }
+  };
+
+  // Function to view a file in modal
+  const handleViewFile = (fileUrl: string, fileName: string) => {
+    setCurrentFile({ url: fileUrl, name: fileName });
+    setFileViewerOpen(true);
   };
 
   // Function to delete a message
@@ -155,6 +300,11 @@ const MessagesPage = () => {
     setMessageToDelete(null);
   };
 
+  // Function to toggle sort order
+  const toggleSortOrder = () => {
+    setSortOrder(sortOrder === 'newest' ? 'oldest' : 'newest');
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -172,7 +322,14 @@ const MessagesPage = () => {
             <Button 
               variant="outline" 
               size="sm" 
-              onClick={() => setLoading(!loading)} // Simple refresh toggle
+              onClick={toggleSortOrder}
+            >
+              Sort: {sortOrder === 'newest' ? 'Newest First' : 'Oldest First'}
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setLoading(!loading)}
               disabled={dataLoading}
             >
               <RefreshCw className={`w-4 h-4 ${dataLoading ? 'animate-spin' : ''}`} />
@@ -243,65 +400,78 @@ const MessagesPage = () => {
                         className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                       />
                     </TableCell>
-                    <TableCell className="font-medium">
-                      {message.senderName}
-                    </TableCell>
-                    <TableCell>{message.subject}</TableCell>
+                    <TableCell className="font-medium">{message.senderName || message.senderId}</TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-1">
-                        <Clock className="w-4 h-4 text-muted-foreground" />
-                        <span>{formatTimestamp(message.timestamp)}</span>
+                      <div className="flex items-center gap-2">
+                        {!message.read && (
+                          <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                        )}
+                        <span>{message.subject}</span>
                       </div>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-sm">
+                      {formatTimestamp(message.timestamp)}
                     </TableCell>
                     <TableCell>
                       {message.fileName ? (
-                        <div className="flex items-center gap-2">
-                          <FileText className="w-4 h-4" />
-                          <span className="text-sm">{message.fileName}</span>
-                          {message.fileUrl && (
+                        <div className="flex items-center gap-1">
+                          <FileText className="w-4 h-4 text-muted-foreground" />
+                          <span className="text-xs text-muted-foreground truncate max-w-[80px]">
+                            {message.fileName}
+                          </span>
+                          <div className="flex gap-1">
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => handleDownloadFile(message.fileUrl!, message.fileName!)}
-                              className="ml-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50"
+                              onClick={() => handleViewFile(message.fileUrl, message.fileName!)}
+                              className="h-5 w-5 p-0"
                             >
-                              <Download className="w-4 h-4" />
+                              <Eye className="w-2.5 h-2.5" />
                             </Button>
-                          )}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDownloadFile(message.fileUrl, message.fileName!)}
+                              className="h-5 w-5 p-0"
+                            >
+                              <Download className="w-2.5 h-2.5" />
+                            </Button>
+                          </div>
                         </div>
                       ) : (
-                        'No file attached'
+                        <span className="text-xs text-muted-foreground">No file</span>
                       )}
                     </TableCell>
                     <TableCell>
-                      <div className="flex gap-2">
-                        {!message.read && (
+                      <div className="flex gap-1">
+                        {!message.read ? (
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => message.id && handleMarkAsRead(message.id)}
+                            onClick={() => handleMarkAsRead(message.id!)}
+                            className="h-8 px-2"
                           >
-                            Mark as Read
+                            <MailOpen className="w-3 h-3 mr-1" />
+                            Mark Read
                           </Button>
-                        )}
-                        {message.fileUrl && message.fileName && (
+                        ) : (
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handleDownloadFile(message.fileUrl!, message.fileName!)}
+                            disabled
+                            className="h-8 px-2"
                           >
-                            <Download className="w-4 h-4 mr-1" />
-                            Download
+                            <MailOpen className="w-3 h-3 mr-1" />
+                            Read
                           </Button>
                         )}
                         <Button
-                          variant="ghost"
+                          variant="outline"
                           size="sm"
-                          onClick={() => message.id && handleDeleteMessage(message.id, message.subject)}
-                          className="text-red-600 hover:text-red-800 hover:bg-red-50"
+                          onClick={() => handleDeleteMessage(message.id!, message.subject)}
+                          className="h-8 px-2"
                         >
-                          <Trash2 className="w-4 h-4" />
-                          <span className="sr-only">Delete</span>
+                          <Trash2 className="w-3 h-3" />
                         </Button>
                       </div>
                     </TableCell>
@@ -311,26 +481,36 @@ const MessagesPage = () => {
             </Table>
           </div>
         )}
-        
-        {/* Delete Confirmation Dialog */}
-        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-              <AlertDialogDescription>
-                This action cannot be undone. This will permanently delete the message
-                {messageToDelete ? ` "${messageToDelete.subject}"` : ''}.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel onClick={cancelDeleteMessage}>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={confirmDeleteMessage} className="bg-red-600 hover:bg-red-700">
-                Delete
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
       </CardContent>
+      
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Deletion</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete the message "{messageToDelete?.subject}"? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={cancelDeleteMessage}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={confirmDeleteMessage}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      
+      {/* File Viewer Modal */}
+      <FileViewerModal 
+        isOpen={fileViewerOpen}
+        onClose={() => setFileViewerOpen(false)}
+        fileUrl={currentFile?.url || ''}
+        fileName={currentFile?.name || ''}
+      />
     </Card>
   );
 };

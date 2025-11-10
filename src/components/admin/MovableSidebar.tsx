@@ -37,7 +37,7 @@ const MovableSidebar = ({
   onLogout,
   isMobile = false
 }: MovableSidebarProps) => {
-  const [sidebarExpanded, setSidebarExpanded] = useState(true);
+  const [sidebarExpanded, setSidebarExpanded] = useState(!isMobile);
   const [sidebarPosition, setSidebarPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
@@ -134,6 +134,9 @@ const MovableSidebar = ({
   useEffect(() => {
     if (isMobile) {
       setSidebarPosition({ x: 0, y: 0 });
+      setSidebarExpanded(false); // Collapse sidebar on mobile by default
+    } else {
+      setSidebarExpanded(true); // Expand sidebar on desktop by default
     }
   }, [isMobile]);
 
@@ -145,7 +148,7 @@ const MovableSidebar = ({
         left: isMobile ? 'auto' : isDragging ? sidebarPosition.x : 'auto',
         top: isMobile ? 'auto' : isDragging ? sidebarPosition.y : 'auto',
         zIndex: isMobile ? 'auto' : isDragging ? 1000 : 'auto',
-        width: sidebarExpanded ? '16rem' : '5rem',
+        width: isMobile ? '100%' : sidebarExpanded ? '16rem' : '5rem',
         transition: isDragging ? 'none' : 'width 0.3s ease',
         height: '100%',
         maxHeight: '100vh'
@@ -180,7 +183,19 @@ const MovableSidebar = ({
           return (
             <button
               key={item.id}
-              onClick={() => setActiveSection(item.id)}
+              onClick={() => {
+                setActiveSection(item.id);
+                if (isMobile) {
+                  // Close sidebar on mobile after selecting a section
+                  const sidebarContainer = sidebarRef.current?.parentElement;
+                  if (sidebarContainer) {
+                    setTimeout(() => {
+                      const closeEvent = new CustomEvent('click', { bubbles: true });
+                      sidebarContainer.dispatchEvent(closeEvent);
+                    }, 100);
+                  }
+                }
+              }}
               className={`w-full flex items-center px-3 py-2 text-left transition-all duration-300 rounded-lg mb-1 ${
                 activeSection === item.id
                   ? 'bg-primary text-primary-foreground'

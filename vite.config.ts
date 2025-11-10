@@ -5,20 +5,21 @@ import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
+  base: '/ERP/', // Add this line for base path
   server: {
-    host: "::",
+    host: "0.0.0.0",
     port: 8087,
     proxy: {
       '/upload': {
-        target: 'http://localhost:3002', // Changed from 3001 to 3002
+        target: 'http://127.0.0.1:3002', // Changed from localhost to 127.0.0.1
         changeOrigin: true,
       },
       '/file': {
-        target: 'http://localhost:3002', // Changed from 3001 to 3002
+        target: 'http://127.0.0.1:3002', // Changed from localhost to 127.0.0.1
         changeOrigin: true,
       },
       '/message-attachments': {
-        target: 'http://localhost:3002', // Changed from 3001 to 3002
+        target: 'http://127.0.0.1:3002', // Changed from localhost to 127.0.0.1
         changeOrigin: true,
       }
     }

@@ -11,13 +11,79 @@ import { useData } from '@/contexts/DataContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { Message } from '@/services/messageService';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Send, RefreshCw, FileText, Clock, Download, Trash2, Search } from 'lucide-react';
+import { Send, RefreshCw, FileText, Clock, Download, Trash2, Search, Eye, X } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { downloadLocalFile } from '@/services/messageFileService';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Timestamp } from 'firebase/firestore';
+
+// File viewer modal component
+const FileViewerModal = ({ 
+  isOpen, 
+  onClose, 
+  fileUrl, 
+  fileName 
+}: { 
+  isOpen: boolean; 
+  onClose: () => void; 
+  fileUrl: string; 
+  fileName: string; 
+}) => {
+  if (!isOpen) return null;
+
+  const isImage = fileName.match(/\.(jpg|jpeg|png|gif|bmp|webp)$/i);
+  const isPdf = fileName.match(/\.pdf$/i);
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] flex flex-col">
+        <div className="flex justify-between items-center p-4 border-b">
+          <h3 className="text-lg font-semibold truncate">{fileName}</h3>
+          <Button variant="ghost" size="sm" onClick={onClose}>
+            <X className="w-4 h-4" />
+          </Button>
+        </div>
+        <div className="flex-1 overflow-auto p-4">
+          {isImage ? (
+            <div className="flex justify-center">
+              <img 
+                src={fileUrl} 
+                alt={fileName} 
+                className="max-w-full max-h-[70vh] object-contain"
+              />
+            </div>
+          ) : isPdf ? (
+            <div className="flex justify-center">
+              <iframe 
+                src={fileUrl} 
+                className="w-full h-[70vh]"
+                title={fileName}
+              />
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-[70vh] text-center">
+              <FileText className="w-16 h-16 text-gray-400 mb-4" />
+              <p className="mb-4">This file type cannot be previewed directly.</p>
+              <Button onClick={() => window.open(fileUrl, '_blank')}>
+                <Download className="w-4 h-4 mr-2" />
+                Download File
+              </Button>
+            </div>
+          )}
+        </div>
+        <div className="p-4 border-t flex justify-end">
+          <Button onClick={() => window.open(fileUrl, '_blank')}>
+            <Download className="w-4 h-4 mr-2" />
+            Download
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const MessageUser = () => {
-  const { employees, sendMessage, messages, loading: dataLoading, deleteMessage } = useData(); // Add deleteMessage
+  const { employees, sendMessage, messages, loading: dataLoading, deleteMessage } = useData();
   const { user } = useAuth();
   const [selectedUser, setSelectedUser] = useState<string>('');
   const [subject, setSubject] = useState<string>('');
@@ -33,15 +99,68 @@ const MessageUser = () => {
   const [messageToDelete, setMessageToDelete] = useState<{ id: string; subject: string } | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [selectedMessages, setSelectedMessages] = useState<string[]>([]);
+  const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
+  const [fileViewerOpen, setFileViewerOpen] = useState<boolean>(false);
+  const [currentFile, setCurrentFile] = useState<{ url: string; name: string } | null>(null);
 
-  // Filter messages to show only those sent by the current admin
+  // Helper function to convert timestamp to Date
+  const convertTimestampToDate = (timestamp: any): Date => {
+    if (!timestamp) return new Date();
+    try {
+      // Handle Firebase Timestamp objects
+      if (timestamp instanceof Timestamp) {
+        return timestamp.toDate();
+      }
+      // Handle objects with toDate method (like Firebase Timestamp)
+      if (timestamp.toDate && typeof timestamp.toDate === 'function') {
+        return timestamp.toDate();
+      }
+      // Handle regular Date objects
+      if (timestamp instanceof Date) {
+        return timestamp;
+      }
+      // Handle string timestamps
+      if (typeof timestamp === 'string') {
+        const date = new Date(timestamp);
+        if (!isNaN(date.getTime())) {
+          return date;
+        }
+      }
+      // Handle number timestamps (Unix timestamps)
+      if (typeof timestamp === 'number') {
+        const date = new Date(timestamp);
+        if (!isNaN(date.getTime())) {
+          return date;
+        }
+      }
+      return new Date();
+    } catch (error) {
+      console.error('Error converting timestamp:', error);
+      return new Date();
+    }
+  };
+
+  // Filter messages to show only those sent by the current admin and sort by date
   useEffect(() => {
     if (messages.length > 0 && user?.email) {
-      const adminMessages = messages.filter(msg => msg.senderId === user.email);
+      const adminMessages = messages
+        .filter(msg => msg.senderId === user.email)
+        .sort((a, b) => {
+          // Convert timestamps to Date objects for comparison
+          const dateA = convertTimestampToDate(a.timestamp);
+          const dateB = convertTimestampToDate(b.timestamp);
+          
+          // Sort based on selected order
+          if (sortOrder === 'newest') {
+            return dateB.getTime() - dateA.getTime(); // Descending (newest first)
+          } else {
+            return dateA.getTime() - dateB.getTime(); // Ascending (oldest first)
+          }
+        });
       setSentMessages(adminMessages);
       setInitialLoading(false);
     }
-  }, [messages, user]);
+  }, [messages, user, sortOrder]);
 
   // Filter messages based on search term
   const filteredMessages = useMemo(() => {
@@ -81,7 +200,7 @@ const MessageUser = () => {
       setLoading(true);
       setDeleteDialogOpen(false);
       console.log('Deleting message with ID:', messageToDelete.id);
-      await deleteMessage(messageToDelete.id); // This should now be available
+      await deleteMessage(messageToDelete.id);
       console.log('Message deleted successfully');
       
       toast.success('Message deleted successfully');
@@ -102,7 +221,7 @@ const MessageUser = () => {
 
   // Wrapper function for refresh button onClick
   const handleRefreshClick = () => {
-    setRefreshing(!refreshing); // Simple refresh toggle
+    setRefreshing(!refreshing);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -168,12 +287,12 @@ const MessageUser = () => {
       // Prepare the message data (note: file handling is done in the DataContext)
       const messageData = {
         senderId: user.email,
-        senderName: user.email, // Use email as sender name since displayName is not available
+        senderName: user.email,
         receiverId: selectedUser,
         receiverName: receiver.name || receiver.email,
         subject,
         content,
-        read: false // Add the read property here
+        read: false
       };
 
       console.log('About to send message:', messageData);
@@ -198,11 +317,11 @@ const MessageUser = () => {
       
       // Handle specific error cases
       if (error.message && error.message.includes('File upload failed')) {
-        // Show a more informative error message
-        toast.error(`File upload failed: ${error.message}. The message was not sent.`);
+        toast.error(`File upload failed: ${error.message}`);
+      } else if (error.message) {
+        toast.error(error.message);
       } else {
-        const errorMessage = error.message || error.toString() || 'Failed to send message. Please try again.';
-        toast.error(`Failed to send message: ${errorMessage}`);
+        toast.error('Failed to send message. Please try again.');
       }
     } finally {
       setLoading(false);
@@ -221,29 +340,8 @@ const MessageUser = () => {
     if (!timestamp) return 'Unknown';
     try {
       // Handle Firebase Timestamp objects
-      if (timestamp.toDate) {
-        const date = timestamp.toDate();
-        return date.toLocaleString();
-      }
-      // Handle regular Date objects
-      else if (timestamp instanceof Date) {
-        return timestamp.toLocaleString();
-      }
-      // Handle string timestamps
-      else if (typeof timestamp === 'string') {
-        const date = new Date(timestamp);
-        if (!isNaN(date.getTime())) {
-          return date.toLocaleString();
-        }
-      }
-      // Handle number timestamps (Unix timestamps)
-      else if (typeof timestamp === 'number') {
-        const date = new Date(timestamp);
-        if (!isNaN(date.getTime())) {
-          return date.toLocaleString();
-        }
-      }
-      return 'Unknown';
+      const date = convertTimestampToDate(timestamp);
+      return date.toLocaleString();
     } catch (error) {
       console.error('Error formatting timestamp:', error);
       return 'Unknown';
@@ -280,6 +378,12 @@ const MessageUser = () => {
     }
   };
 
+  // Function to view a file in modal
+  const handleViewFile = (fileUrl: string, fileName: string) => {
+    setCurrentFile({ url: fileUrl, name: fileName });
+    setFileViewerOpen(true);
+  };
+
   // Selection functionality
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
@@ -313,6 +417,11 @@ const MessageUser = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Function to toggle sort order
+  const toggleSortOrder = () => {
+    setSortOrder(sortOrder === 'newest' ? 'oldest' : 'newest');
   };
 
   return (
@@ -426,7 +535,14 @@ const MessageUser = () => {
                   <Button 
                     variant="outline" 
                     size="sm" 
-                    onClick={() => setRefreshing(!refreshing)} // Simple refresh toggle
+                    onClick={toggleSortOrder}
+                  >
+                    Sort: {sortOrder === 'newest' ? 'Newest First' : 'Oldest First'}
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => setRefreshing(!refreshing)}
                     disabled={dataLoading || refreshing}
                   >
                     <RefreshCw className={`w-4 h-4 mr-2 ${dataLoading || refreshing ? 'animate-spin' : ''}`} />
@@ -542,14 +658,24 @@ const MessageUser = () => {
                                   <FileText className="w-4 h-4" />
                                   <span className="text-sm">{message.fileName}</span>
                                   {message.fileUrl && (
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => handleDownloadFile(message.fileUrl!, message.fileName!)}
-                                      className="ml-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50"
-                                    >
-                                      <Download className="w-4 h-4" />
-                                    </Button>
+                                    <div className="flex gap-1">
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleViewFile(message.fileUrl!, message.fileName!)}
+                                        className="ml-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50"
+                                      >
+                                        <Eye className="w-4 h-4" />
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleDownloadFile(message.fileUrl!, message.fileName!)}
+                                        className="text-blue-600 hover:text-blue-800 hover:bg-blue-50"
+                                      >
+                                        <Download className="w-4 h-4" />
+                                      </Button>
+                                    </div>
                                   )}
                                 </div>
                               ) : (
@@ -604,6 +730,14 @@ const MessageUser = () => {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+        
+        {/* File Viewer Modal */}
+        <FileViewerModal 
+          isOpen={fileViewerOpen}
+          onClose={() => setFileViewerOpen(false)}
+          fileUrl={currentFile?.url || ''}
+          fileName={currentFile?.name || ''}
+        />
       </CardContent>
     </Card>
   );

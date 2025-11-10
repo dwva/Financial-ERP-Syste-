@@ -1,11 +1,79 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useData } from '@/contexts/DataContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { CheckCircle, Clock, FileText, AlertTriangle, Receipt } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { CheckCircle, Clock, FileText, AlertTriangle, Receipt, Eye, Download, X } from 'lucide-react';
+
+// File viewer modal component
+const FileViewerModal = ({ 
+  isOpen, 
+  onClose, 
+  fileUrl, 
+  fileName 
+}: { 
+  isOpen: boolean; 
+  onClose: () => void; 
+  fileUrl: string; 
+  fileName: string; 
+}) => {
+  if (!isOpen) return null;
+
+  const isImage = fileName.match(/\.(jpg|jpeg|png|gif|bmp|webp)$/i);
+  const isPdf = fileName.match(/\.pdf$/i);
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] flex flex-col">
+        <div className="flex justify-between items-center p-4 border-b">
+          <h3 className="text-lg font-semibold truncate">{fileName}</h3>
+          <Button variant="ghost" size="sm" onClick={onClose}>
+            <X className="w-4 h-4" />
+          </Button>
+        </div>
+        <div className="flex-1 overflow-auto p-4">
+          {isImage ? (
+            <div className="flex justify-center">
+              <img 
+                src={fileUrl} 
+                alt={fileName} 
+                className="max-w-full max-h-[70vh] object-contain"
+              />
+            </div>
+          ) : isPdf ? (
+            <div className="flex justify-center">
+              <iframe 
+                src={fileUrl} 
+                className="w-full h-[70vh]"
+                title={fileName}
+              />
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-[70vh] text-center">
+              <FileText className="w-16 h-16 text-gray-400 mb-4" />
+              <p className="mb-4">This file type cannot be previewed directly.</p>
+              <Button onClick={() => window.open(fileUrl, '_blank')}>
+                <Download className="w-4 h-4 mr-2" />
+                Download File
+              </Button>
+            </div>
+          )}
+        </div>
+        <div className="p-4 border-t flex justify-end">
+          <Button onClick={() => window.open(fileUrl, '_blank')}>
+            <Download className="w-4 h-4 mr-2" />
+            Download
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const ExpensesOverview = () => {
   const { expenses, employees } = useData();
+  const [fileViewerOpen, setFileViewerOpen] = useState<boolean>(false);
+  const [currentFile, setCurrentFile] = useState<{ url: string; name: string } | null>(null);
 
   // Get user name for an expense
   const getUserName = (userId: string) => {
@@ -36,11 +104,48 @@ const ExpensesOverview = () => {
     return new Date(dateString).toLocaleDateString();
   };
 
-  // Group expenses into rows of 3 for desktop, 1 for mobile, 2 for tablet
-  const groupedExpenses = useMemo(() => {
-    // This will be handled dynamically in the render function for better responsiveness
-    return expenses;
-  }, [expenses]);
+  // Handle file view in modal
+  const handleViewFile = (fileUrl: string, fileName: string) => {
+    if (fileUrl) {
+      // Open file in modal instead of new tab
+      setCurrentFile({ url: fileUrl, name: fileName });
+      setFileViewerOpen(true);
+    }
+  };
+
+  // Handle file download
+  const handleDownloadFile = async (fileUrl: string, fileName: string) => {
+    if (fileUrl && fileName) {
+      try {
+        // Fetch the file
+        const response = await fetch(fileUrl);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch file: ${response.status} ${response.statusText}`);
+        }
+        
+        // Get the blob
+        const blob = await response.blob();
+        
+        // Create a temporary link element
+        const link = document.createElement('a');
+        const url = window.URL.createObjectURL(blob);
+        link.href = url;
+        link.download = fileName || 'expense-attachment';
+        
+        // Add to document, click, and remove
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        // Clean up the URL object
+        window.URL.revokeObjectURL(url);
+      } catch (error) {
+        console.error('Error downloading file:', error);
+        // Fallback: open in new tab if download fails
+        window.open(fileUrl, '_blank');
+      }
+    }
+  };
 
   return (
     <Card className="w-full">
@@ -64,12 +169,12 @@ const ExpensesOverview = () => {
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {groupedExpenses.length === 0 ? (
+          {expenses.length === 0 ? (
             <div className="text-center text-muted-foreground py-8 col-span-full">
               No expenses found
             </div>
           ) : (
-            groupedExpenses.map((expense) => (
+            expenses.map((expense) => (
               <div 
                 key={expense.id} 
                 className="border rounded-lg p-4 bg-white shadow-sm hover:shadow-md transition-shadow"
@@ -105,6 +210,36 @@ const ExpensesOverview = () => {
                   <p className="text-xs text-muted-foreground truncate mt-1">{expense.description}</p>
                 </div>
                 
+                {/* File Attachment Section */}
+                {(expense.file || expense.fileUrl) && (
+                  <div className="mt-2 flex items-center justify-between bg-muted/50 p-2 rounded">
+                    <div className="flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-xs text-muted-foreground truncate max-w-[100px]">
+                        {expense.fileName || 'Attachment'}
+                      </span>
+                    </div>
+                    <div className="flex gap-1">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-6 w-6 p-0"
+                        onClick={() => handleViewFile(expense.file || expense.fileUrl, expense.fileName || 'expense-file')}
+                      >
+                        <Eye className="w-3 h-3" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-6 w-6 p-0"
+                        onClick={() => handleDownloadFile(expense.file || expense.fileUrl, expense.fileName || 'expense-file')}
+                      >
+                        <Download className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                
                 <div className="mt-3 flex justify-between items-center">
                   <div>
                     {expense.status === 'received' ? (
@@ -128,6 +263,14 @@ const ExpensesOverview = () => {
           )}
         </div>
       </CardContent>
+      
+      {/* File Viewer Modal */}
+      <FileViewerModal 
+        isOpen={fileViewerOpen}
+        onClose={() => setFileViewerOpen(false)}
+        fileUrl={currentFile?.url || ''}
+        fileName={currentFile?.name || ''}
+      />
     </Card>
   );
 };

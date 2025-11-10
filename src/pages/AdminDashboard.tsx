@@ -16,7 +16,7 @@ import OverdueExpenses from '@/components/admin/OverdueExpenses';
 import DataManagement from '@/components/admin/DataManagement';
 import ExpensesOverview from '@/components/admin/ExpensesOverview';
 import { Button } from '@/components/ui/button';
-import { Menu } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
 
 const AdminDashboard = () => {
   const [activeSection, setActiveSection] = useState('analytics');
@@ -102,7 +102,7 @@ const AdminDashboard = () => {
       {/* Overlay for mobile sidebar */}
       {sidebarOpen && isMobile && (
         <div 
-          className="fixed inset-0 bg-black bg-opacity-50 z-20"
+          className="fixed inset-0 bg-black bg-opacity-50 z-40"
           onClick={() => setSidebarOpen(false)}
         />
       )}
@@ -110,11 +110,23 @@ const AdminDashboard = () => {
       {/* Movable Sidebar */}
       <div className={
         isMobile 
-          ? `fixed inset-y-0 left-0 z-40 transform transition-transform duration-300 ease-in-out ${
+          ? `fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-in-out ${
               sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-            }`
+            } w-full max-w-xs`
           : 'flex flex-shrink-0'
       }>
+        {isMobile && (
+          <div className="absolute top-4 right-4 z-50">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setSidebarOpen(false)}
+              className="rounded-full p-2"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
         <MovableSidebar 
           activeSection={activeSection}
           setActiveSection={setActiveSection}

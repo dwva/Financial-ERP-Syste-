@@ -109,28 +109,28 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground font-body text-sm;
+    @apply bg-background text-foreground font-body text-xs;
   }
   
   h1, h2, h3, h4, h5, h6 {
     @apply font-heading;
   }
   
-  /* Base text sizes */
-  .text-xs { font-size: 0.7rem; }
-  .text-sm { font-size: 0.8rem; }
-  .text-base { font-size: 0.9rem; }
-  .text-lg { font-size: 1rem; }
-  .text-xl { font-size: 1.1rem; }
-  .text-2xl { font-size: 1.2rem; }
-  .text-3xl { font-size: 1.3rem; }
-  .text-4xl { font-size: 1.4rem; }
-  .text-5xl { font-size: 1.5rem; }
+  /* Base text sizes - smaller across the board */
+  .text-xs { font-size: 0.65rem; }
+  .text-sm { font-size: 0.7rem; }
+  .text-base { font-size: 0.75rem; }
+  .text-lg { font-size: 0.8rem; }
+  .text-xl { font-size: 0.85rem; }
+  .text-2xl { font-size: 0.9rem; }
+  .text-3xl { font-size: 0.95rem; }
+  .text-4xl { font-size: 1rem; }
+  .text-5xl { font-size: 1.1rem; }
 }
 
 @layer components {
   .btn-rounded {
-    @apply rounded-2xl px-4 py-2 font-medium transition-all duration-300 text-sm;
+    @apply rounded-2xl px-3 py-1.5 font-medium transition-all duration-300 text-xs;
   }
   
   .card-rounded {
@@ -138,11 +138,11 @@ All colors MUST be HSL.
   }
   
   .input-rounded {
-    @apply rounded-xl border-2 focus:ring-2 focus:ring-primary text-sm;
+    @apply rounded-xl border-2 focus:ring-2 focus:ring-primary text-xs;
   }
   
   .select-rounded {
-    @apply rounded-xl border-2 focus:ring-2 focus:ring-primary text-sm;
+    @apply rounded-xl border-2 focus:ring-2 focus:ring-primary text-xs;
   }
   
   .chart-primary {

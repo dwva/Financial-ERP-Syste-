@@ -205,10 +205,10 @@ const FinancialOverview = () => {
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-4">
-            <div className="w-40">
+            <div className="w-full sm:w-40">
               <label className="text-sm font-medium mb-1 block">Month</label>
               <Select value={filterMonth} onValueChange={setFilterMonth}>
-                <SelectTrigger className="select-rounded">
+                <SelectTrigger className="select-rounded w-full">
                   <SelectValue placeholder="Select month" />
                 </SelectTrigger>
                 <SelectContent>
@@ -220,10 +220,10 @@ const FinancialOverview = () => {
               </Select>
             </div>
             
-            <div className="w-40">
+            <div className="w-full sm:w-40">
               <label className="text-sm font-medium mb-1 block">Year</label>
               <Select value={filterYear} onValueChange={setFilterYear}>
-                <SelectTrigger className="select-rounded">
+                <SelectTrigger className="select-rounded w-full">
                   <SelectValue placeholder="Select year" />
                 </SelectTrigger>
                 <SelectContent>
@@ -235,10 +235,10 @@ const FinancialOverview = () => {
               </Select>
             </div>
             
-            <div className="w-40">
+            <div className="w-full sm:w-40">
               <label className="text-sm font-medium mb-1 block">Sector</label>
               <Select value={filterSector} onValueChange={setFilterSector}>
-                <SelectTrigger className="select-rounded">
+                <SelectTrigger className="select-rounded w-full">
                   <SelectValue placeholder="Select sector" />
                 </SelectTrigger>
                 <SelectContent>
@@ -250,8 +250,8 @@ const FinancialOverview = () => {
               </Select>
             </div>
             
-            <div className="flex items-end">
-              <Button variant="outline" onClick={clearFilters} className="gap-2 btn-rounded">
+            <div className="flex items-end w-full sm:w-auto">
+              <Button variant="outline" onClick={clearFilters} className="gap-2 btn-rounded w-full sm:w-auto">
                 <Filter className="w-4 h-4" />
                 Clear Filters
               </Button>
@@ -261,7 +261,7 @@ const FinancialOverview = () => {
       </Card>
 
       {/* Financial Overview Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <Card className="bg-gradient-to-br from-violet-50 to-violet-100 border-violet-200 card-rounded">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Expenses</CardTitle>
@@ -308,7 +308,7 @@ const FinancialOverview = () => {
       </div>
 
       {/* Expense Status Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
         <Card className="bg-gradient-to-br from-yellow-50 to-yellow-100 border-yellow-200 card-rounded">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Pending Expenses</CardTitle>
@@ -333,9 +333,9 @@ const FinancialOverview = () => {
       </div>
 
       {/* Charts Section */}
-      <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-2">
+      <div className="grid gap-6 grid-cols-1">
         {/* Interactive Expenses and Revenues Area Chart */}
-        <div className="col-span-1 lg:col-span-2">
+        <div className="col-span-1">
           <ChartAreaInteractive 
             data={expensesByDate}
             title="Expenses and Revenues Over Time"
@@ -355,7 +355,7 @@ const FinancialOverview = () => {
           />
         </div>
 
-        {/* New Bar Chart Component - smaller size */}
+        {/* New Bar Chart Component */}
         <div className="col-span-1 flex justify-center">
           <ChartBarDefault />
         </div>

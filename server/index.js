@@ -4,15 +4,34 @@ import path from 'path';
 import fs from 'fs';
 import cors from 'cors';
 import { fileURLToPath } from 'url';
+import { networkInterfaces } from 'os';
 
 // Create __dirname equivalent for ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Get the local IP address
+const getLocalIP = () => {
+  const nets = networkInterfaces();
+  for (const [name, network] of Object.entries(nets)) {
+    if (!network) continue;
+    for (const net of network) {
+      // Skip internal (i.e. 127.0.0.1) and non-ipv4 addresses
+      if (!net.internal && net.family === 'IPv4' && !net.address.startsWith('169.254')) {
+        return net.address;
+      }
+    }
+  }
+  // For VPS environments, return a more generic approach
+  return process.env.HOST || '0.0.0.0';
+};
+
 const app = express();
 // Try different ports to avoid conflicts
 const PORT = process.env.PORT || 3002;
-const HOST = process.env.HOST || 'localhost';
+// Use actual IP address for URL generation, but still listen on all interfaces
+const HOST = process.env.HOST || getLocalIP();
+const LISTEN_HOST = '0.0.0.0'; // Always listen on all interfaces
 
 // Middleware with CORS configuration - more permissive for local development
 app.use(cors({
@@ -121,6 +140,8 @@ app.post('/upload', userUpload.single('file'), (req, res) => {
     console.log('File saved to:', req.file.path);
     
     // Return file information - path should match the folder it's stored in
+    // For VPS environments, use the host from the request to ensure external access works
+    const requestHost = req.get('host') || `${HOST}:${PORT}`;
     res.json({
       message: 'File uploaded successfully',
       file: {
@@ -128,7 +149,7 @@ app.post('/upload', userUpload.single('file'), (req, res) => {
         originalname: req.file.originalname,
         size: req.file.size,
         path: `/admin-attachments/${req.file.filename}`, // This matches the route for expense attachments
-        url: `http://${HOST}:${PORT}/admin-attachments/${req.file.filename}`
+        url: `http://${requestHost}/admin-attachments/${req.file.filename}`
       }
     });
   } catch (error) {
@@ -153,6 +174,8 @@ app.post('/admin-upload', adminUpload.single('file'), (req, res) => {
     console.log('File saved to:', req.file.path);
     
     // Return file information - path should match the folder it's stored in
+    // For VPS environments, use the host from the request to ensure external access works
+    const requestHost = req.get('host') || `${HOST}:${PORT}`;
     res.json({
       message: 'File uploaded successfully',
       file: {
@@ -160,7 +183,7 @@ app.post('/admin-upload', adminUpload.single('file'), (req, res) => {
         originalname: req.file.originalname,
         size: req.file.size,
         path: `/message-attachments/${req.file.filename}`, // This matches the route for message attachments
-        url: `http://${HOST}:${PORT}/message-attachments/${req.file.filename}`
+        url: `http://${requestHost}/message-attachments/${req.file.filename}`
       }
     });
   } catch (error) {
@@ -195,9 +218,11 @@ app.delete('/file/:filename', (req, res) => {
 });
 
 // Start server with error handling
-app.listen(PORT, '0.0.0.0', () => {
+app.listen(PORT, LISTEN_HOST, () => {
   console.log(`File upload server running on port ${PORT}`);
   console.log(`Access files at http://${HOST}:${PORT}`);
+  console.log(`Listening on all interfaces (${LISTEN_HOST})`);
+  console.log(`External access URL: http://${HOST}:${PORT}`);
 }).on('error', (err) => {
   if (err.code === 'EADDRINUSE') {
     console.log(`Port ${PORT} is already in use. Please kill the process or use a different port.`);

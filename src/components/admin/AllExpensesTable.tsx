@@ -5,12 +5,88 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Receipt, FileText, Image as ImageIcon, AlertTriangle, Download, Trash2 } from 'lucide-react';
+import { 
+  Receipt, 
+  FileText, 
+  Image as ImageIcon, 
+  AlertTriangle, 
+  Download, 
+  Trash2,
+  Eye,
+  X
+} from 'lucide-react';
 import { toast } from 'react-toastify';
+
+// File viewer modal component
+const FileViewerModal = ({ 
+  isOpen, 
+  onClose, 
+  fileUrl, 
+  fileName 
+}: { 
+  isOpen: boolean; 
+  onClose: () => void; 
+  fileUrl: string; 
+  fileName: string; 
+}) => {
+  if (!isOpen) return null;
+
+  const isImage = fileName.match(/\.(jpg|jpeg|png|gif|bmp|webp)$/i);
+  const isPdf = fileName.match(/\.pdf$/i);
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] flex flex-col">
+        <div className="flex justify-between items-center p-4 border-b">
+          <h3 className="text-lg font-semibold truncate">{fileName}</h3>
+          <Button variant="ghost" size="sm" onClick={onClose}>
+            <X className="w-4 h-4" />
+          </Button>
+        </div>
+        <div className="flex-1 overflow-auto p-4">
+          {isImage ? (
+            <div className="flex justify-center">
+              <img 
+                src={fileUrl} 
+                alt={fileName} 
+                className="max-w-full max-h-[70vh] object-contain"
+              />
+            </div>
+          ) : isPdf ? (
+            <div className="flex justify-center">
+              <iframe 
+                src={fileUrl} 
+                className="w-full h-[70vh]"
+                title={fileName}
+              />
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-[70vh] text-center">
+              <FileText className="w-16 h-16 text-gray-400 mb-4" />
+              <p className="mb-4">This file type cannot be previewed directly.</p>
+              <Button onClick={() => window.open(fileUrl, '_blank')}>
+                <Download className="w-4 h-4 mr-2" />
+                Download File
+              </Button>
+            </div>
+          )}
+        </div>
+        <div className="p-4 border-t flex justify-end">
+          <Button onClick={() => window.open(fileUrl, '_blank')}>
+            <Download className="w-4 h-4 mr-2" />
+            Download
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const AllExpensesTable = () => {
   const { expenses, employees, deleteExpense } = useData();
   const [selectedExpenses, setSelectedExpenses] = useState<string[]>([]);
+  const [fileViewerOpen, setFileViewerOpen] = useState<boolean>(false);
+  const [currentFile, setCurrentFile] = useState<{ url: string; name: string } | null>(null);
 
   const getFileIcon = (fileName: string | null) => {
     if (!fileName) return <FileText className="w-4 h-4" />;
@@ -61,6 +137,19 @@ const AllExpensesTable = () => {
     
     // In a real implementation, you would implement bulk download functionality
     toast.info('Bulk download functionality would be implemented here');
+  };
+
+  // Function to view a file in modal
+  const handleViewFile = async (fileUrl: string, fileName: string) => {
+    try {
+      // For expense attachments, they should be accessible via /admin-attachments/ path
+      const correctedFileUrl = fileUrl.replace('/message-attachments/', '/admin-attachments/');
+      setCurrentFile({ url: correctedFileUrl, name: fileName });
+      setFileViewerOpen(true);
+    } catch (error) {
+      console.error('Error preparing file for viewing:', error);
+      toast.error('Failed to view file. Please try downloading instead.');
+    }
   };
 
   return (
@@ -148,9 +237,25 @@ const AllExpensesTable = () => {
                       <TableCell>
                         <div className="flex items-center gap-2">
                           {getFileIcon(expense.fileName)}
-                          <span className="text-sm text-muted-foreground">
-                            {expense.fileName || 'No file'}
-                          </span>
+                          {expense.fileName ? (
+                            <div className="flex items-center gap-1">
+                              <span className="text-sm text-muted-foreground">
+                                {expense.fileName}
+                              </span>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleViewFile(expense.file, expense.fileName!)}
+                                className="h-6 w-6 p-0"
+                              >
+                                <Eye className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">
+                              No file
+                            </span>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell className="text-muted-foreground">
@@ -173,6 +278,14 @@ const AllExpensesTable = () => {
             </TableBody>
           </Table>
         </div>
+        
+        {/* File Viewer Modal */}
+        <FileViewerModal 
+          isOpen={fileViewerOpen}
+          onClose={() => setFileViewerOpen(false)}
+          fileUrl={currentFile?.url || ''}
+          fileName={currentFile?.name || ''}
+        />
       </CardContent>
     </Card>
   );

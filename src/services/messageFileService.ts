@@ -84,52 +84,73 @@ const saveFile = async (file: File, type: 'admin' | 'user'): Promise<{ url: stri
     // Use the appropriate file server URL (port 3002) based on file type
     // Message files (admin messages to users) should use /admin-upload endpoint
     // Expense files (user expenses or admin-created expenses for users) should use /upload endpoint
+    // Use the actual IP address for external access instead of localhost
+    // Get the current origin to determine the correct IP address
+    const currentOrigin = window.location.origin;
+    const baseUrl = currentOrigin.replace(':8088', ':3002').replace(':8087', ':3002');
+    
     const uploadUrl = type === 'admin' 
-      ? 'http://localhost:3002/admin-upload' 
-      : 'http://localhost:3002/upload';
+      ? `${baseUrl}/admin-upload` 
+      : `${baseUrl}/upload`;
     console.log('Uploading file to:', uploadUrl);
     
-    // Add timeout and retry logic
-    const response = await fetchWithTimeout(uploadUrl, {
-      method: 'POST',
-      body: formData,
-      // Add credentials and mode for CORS
-      credentials: 'include',
-      mode: 'cors'
-    }, 10000); // 10 second timeout
-    
-    console.log('Upload response status:', response.status);
-    console.log('Upload response headers:', response.headers);
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Upload failed with response:', errorText);
-      throw new Error(`Failed to upload file to server: ${response.status} ${response.statusText} - ${errorText}`);
+    // Add retry logic for better reliability in VPS environments
+    let lastError: any;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        console.log(`Upload attempt ${attempt}/3`);
+        const response = await fetchWithTimeout(uploadUrl, {
+          method: 'POST',
+          body: formData,
+          // Add credentials and mode for CORS
+          credentials: 'include',
+          mode: 'cors'
+        }, 30000); // 30 second timeout for better reliability
+        
+        console.log('Upload response status:', response.status);
+        console.log('Upload response headers:', response.headers);
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Upload failed with response:', errorText);
+          throw new Error(`Failed to upload file to server: ${response.status} ${response.statusText} - ${errorText}`);
+        }
+        
+        const result = await response.json();
+        console.log('Upload successful:', result);
+        
+        // Create metadata
+        const metadata: FileMetadata = {
+          id: fileId,
+          originalName: file.name,
+          storedName,
+          path: result.file.path,
+          size: file.size,
+          type: file.type,
+          uploadDate: new Date()
+        };
+        
+        // Store metadata
+        await storeFileMetadata(metadata);
+        
+        // Return file information
+        return {
+          url: result.file.url,
+          fileName: file.name,
+          fileId
+        };
+      } catch (error) {
+        lastError = error;
+        console.error(`Upload attempt ${attempt} failed:`, error);
+        if (attempt < 3) {
+          // Wait before retrying
+          await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+        }
+      }
     }
     
-    const result = await response.json();
-    console.log('Upload successful:', result);
-    
-    // Create metadata
-    const metadata: FileMetadata = {
-      id: fileId,
-      originalName: file.name,
-      storedName,
-      path: result.file.path,
-      size: file.size,
-      type: file.type,
-      uploadDate: new Date()
-    };
-    
-    // Store metadata
-    await storeFileMetadata(metadata);
-    
-    // Return file information
-    return {
-      url: result.file.url,
-      fileName: file.name,
-      fileId
-    };
+    // If all attempts failed, throw the last error
+    throw lastError;
   } catch (error: any) {
     console.error('Error saving message file:', error);
     // More specific error handling
@@ -222,7 +243,12 @@ export const downloadLocalFile = async (fileId: string, fileName?: string): Prom
     
     // Use fetch to get the file and force download
     // The path in metadata should be correct based on where the file was stored
-    const response = await fetch(`http://localhost:3002${fileMetadata.path}`);
+    // Use the current origin to determine the correct IP address
+    const currentOrigin = window.location.origin;
+    const baseUrl = currentOrigin.replace(':8088', ':3002').replace(':8087', ':3002');
+    const fileUrl = `${baseUrl}${fileMetadata.path}`;
+    
+    const response = await fetch(fileUrl);
     
     if (!response.ok) {
       throw new Error(`Failed to fetch file: ${response.status} ${response.statusText}`);

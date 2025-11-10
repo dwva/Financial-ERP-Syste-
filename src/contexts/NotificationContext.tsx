@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useData } from '@/contexts/DataContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 export interface Notification {
   id: string;
@@ -26,7 +27,8 @@ interface NotificationContextType {
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
 
 export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { expenses, messages, invoiceHistory } = useData(); // Add invoiceHistory from DataContext
+  const { expenses, messages, invoiceHistory } = useData();
+  const { user } = useAuth(); // Get current user
   const [notifications, setNotifications] = useState<Notification[]>(() => {
     try {
       const saved = localStorage.getItem('admin_notifications');
@@ -221,15 +223,24 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                   !message.read // Only notify about unread messages
       );
 
-      // Add notifications for new messages
+      // Add notifications for new messages (but only for messages received by users, not sent by admins)
       newMessages.forEach(message => {
         try {
-          addNotification({
-            title: 'New Message Received',
-            message: `You have a new message from ${message.senderName || 'Unknown'}`,
-            type: 'new_message',
-            messageId: message.id
-          });
+          // Skip notification if the current user is an admin and sent this message
+          if (user?.email && message.senderId === user.email) {
+            // This is a message sent by the current admin, don't create notification
+            return;
+          }
+          
+          // Only create notification for messages received by users
+          if (message.receiverId) {
+            addNotification({
+              title: 'New Message Received',
+              message: `You have a new message from ${message.senderName || 'Unknown'}`,
+              type: 'new_message',
+              messageId: message.id
+            });
+          }
         } catch (e) {
           console.error('Error creating new message notification:', e);
         }
@@ -240,7 +251,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     } catch (e) {
       console.error('Error in message notification effect:', e);
     }
-  }, [messages]);
+  }, [messages, user?.email]);
 
   const addNotification = (notification: Omit<Notification, 'id' | 'timestamp' | 'read'>) => {
     try {
