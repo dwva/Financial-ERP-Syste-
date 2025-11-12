@@ -10,13 +10,14 @@ import ServiceCharges from '@/components/admin/ServiceCharges';
 import InvoiceGeneration from '@/components/admin/InvoiceGeneration';
 import InvoiceHistory from '@/components/admin/InvoiceHistory';
 import ProfitLoss from '@/components/admin/ProfitLoss';
-import MessageUser from '@/components/admin/MessageUser';
 import MovableSidebar from '@/components/admin/MovableSidebar';
 import OverdueExpenses from '@/components/admin/OverdueExpenses';
 import DataManagement from '@/components/admin/DataManagement';
 import ExpensesOverview from '@/components/admin/ExpensesOverview';
+import MessageUser from '@/components/admin/MessageUser';
 import { Button } from '@/components/ui/button';
-import { Menu, X } from 'lucide-react';
+import { Bell, LogOut, Menu, X, Mail } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const AdminDashboard = () => {
   const [activeSection, setActiveSection] = useState('analytics');
@@ -24,6 +25,7 @@ const AdminDashboard = () => {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const { user, logout } = useAuth();
   const { unreadCount } = useNotification();
+  const navigate = useNavigate();
 
   // Handle window resize to detect mobile/desktop
   useEffect(() => {
@@ -47,6 +49,13 @@ const AdminDashboard = () => {
       // No need to manually navigate to /login
     } catch (error) {
       console.error('Failed to logout:', error);
+    }
+  };
+
+  const handleNotificationClick = () => {
+    setActiveSection('notifications');
+    if (isMobile) {
+      setSidebarOpen(false);
     }
   };
 
@@ -85,6 +94,72 @@ const AdminDashboard = () => {
 
   return (
     <div className="flex h-screen bg-grey-100 overflow-hidden">
+      {/* Navbar for desktop */}
+      {!isMobile && (
+        <div className="fixed top-0 left-0 right-0 h-16 bg-white border-b z-30 flex items-center justify-between px-4 md:px-6">
+          <div className="flex items-center gap-3">
+            {/* Logo */}
+            <img 
+              src="/mio.png" 
+              alt="Logo" 
+              className="h-8 object-contain"
+            />
+          </div>
+          <div className="flex items-center gap-4">
+            {/* Notification Bell */}
+            <Button 
+              variant="ghost" 
+              size="icon"
+              className="relative h-10 w-10 rounded-full"
+              onClick={handleNotificationClick}
+            >
+              <Bell className="h-5 w-5" />
+              {unreadCount > 0 && (
+                <span className="absolute top-0 right-0 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white transform translate-x-1/2 -translate-y-1/2 bg-red-500 rounded-full">
+                  {unreadCount}
+                </span>
+              )}
+            </Button>
+            
+            {/* Mail Icon - navigates to messages page */}
+            <Button 
+              variant="ghost" 
+              size="icon"
+              className="relative h-10 w-10 rounded-full"
+              onClick={() => {
+                setActiveSection('messages');
+                if (isMobile) {
+                  setSidebarOpen(false);
+                }
+              }}
+            >
+              <Mail className="h-5 w-5" />
+            </Button>
+            
+            {/* Admin Name moved to the right side */}
+            <div className="flex items-center gap-2">
+              <div className="text-right">
+                <p className="text-sm font-medium text-foreground">
+                  {user?.email ? user.email.split('@')[0] : 'Admin'}
+                </p>
+                <p className="text-xs text-muted-foreground">Administrator</p>
+              </div>
+            </div>
+            
+            {/* Logout Button */}
+            <Button 
+              variant="outline" 
+              size="sm"
+              className="h-10 gap-1 px-3"
+              onClick={handleLogout}
+            >
+              <LogOut className="h-4 w-4" />
+              <span className="hidden sm:inline text-sm">Logout</span>
+            </Button>
+          </div>
+        </div>
+      )}
+      
       {/* Mobile menu button */}
       {isMobile && (
         <div className="md:hidden absolute top-4 left-4 z-30">
@@ -96,6 +171,69 @@ const AdminDashboard = () => {
           >
             <Menu className="h-4 w-4" />
           </Button>
+        </div>
+      )}
+      
+      {/* Mobile navbar */}
+      {isMobile && (
+        <div className="md:hidden fixed top-0 left-0 right-0 h-16 bg-white border-b z-20 flex items-center justify-between px-4">
+          {/* Logo */}
+          <div className="flex items-center gap-2">
+            <img 
+              src="/mio.png" 
+              alt="Logo" 
+              className="h-8 object-contain"
+            />
+          </div>
+          
+          {/* Notification Bell, Admin Name, and Logout */}
+          <div className="flex items-center gap-4">
+            <Button 
+              variant="ghost" 
+              size="icon"
+              className="relative h-10 w-10 rounded-full"
+              onClick={handleNotificationClick}
+            >
+              <Bell className="h-5 w-5" />
+              {unreadCount > 0 && (
+                <span className="absolute top-0 right-0 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white transform translate-x-1/2 -translate-y-1/2 bg-red-500 rounded-full">
+                  {unreadCount}
+                </span>
+              )}
+            </Button>
+            
+            {/* Mail Icon - navigates to messages page */}
+            <Button 
+              variant="ghost" 
+              size="icon"
+              className="relative h-10 w-10 rounded-full"
+              onClick={() => {
+                setActiveSection('messages');
+                if (isMobile) {
+                  setSidebarOpen(false);
+                }
+              }}
+            >
+              <Mail className="h-5 w-5" />
+            </Button>
+            
+            {/* Admin Name */}
+            <div className="hidden sm:block text-right mr-2">
+              <p className="text-xs font-medium text-foreground">
+                {user?.email ? user.email.split('@')[0] : 'Admin'}
+              </p>
+              <p className="text-xs text-muted-foreground">Administrator</p>
+            </div>
+            
+            <Button 
+              variant="outline" 
+              size="sm"
+              className="h-10 gap-1 px-3"
+              onClick={handleLogout}
+            >
+              <LogOut className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       )}
 
@@ -138,7 +276,7 @@ const AdminDashboard = () => {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 overflow-auto bg-grey-50">
+      <div className={`flex-1 overflow-auto bg-grey-50 ${!isMobile ? 'pt-20' : 'pt-16'}`}>
         <div className="p-4 md:p-6">
           {renderActiveSection()}
         </div>

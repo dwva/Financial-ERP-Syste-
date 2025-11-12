@@ -78,7 +78,7 @@ const FileViewerModal = ({
 };
 
 const MessagesPage = () => {
-  const { messages, markMessageAsRead, deleteMessage, loading: dataLoading } = useData();
+  const { messages, markMessageAsRead, deleteMessage, loading: dataLoading, getUnreadMessageCount } = useData();
   const { user } = useAuth();
   const { notifications, markAsRead } = useNotification();
   const [loading, setLoading] = useState<boolean>(true);
@@ -89,6 +89,7 @@ const MessagesPage = () => {
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
   const [fileViewerOpen, setFileViewerOpen] = useState<boolean>(false);
   const [currentFile, setCurrentFile] = useState<{ url: string; name: string } | null>(null);
+  const [unreadMessageCount, setUnreadMessageCount] = useState<number>(0); // Track unread message count
 
   // Helper function to convert timestamp to Date
   const convertTimestampToDate = (timestamp: any): Date => {
@@ -145,11 +146,18 @@ const MessagesPage = () => {
           }
         });
       setUserMessages(filteredMessages);
+      
+      // Calculate unread message count for this user
+      const unreadCount = getUnreadMessageCount(user.email);
+      setUnreadMessageCount(unreadCount);
+      
       setLoading(false);
     } else if (messages.length === 0) {
+      setUserMessages([]);
+      setUnreadMessageCount(0);
       setLoading(false);
     }
-  }, [messages, user, sortOrder]);
+  }, [messages, user, sortOrder, getUnreadMessageCount]);
 
   // Mark all messages as read when the user views the messages page
   useEffect(() => {
@@ -181,9 +189,11 @@ const MessagesPage = () => {
       // Show a toast notification if there were new messages
       if (unreadMessages.length > 0) {
         toast.success(`Marked ${unreadMessages.length} message(s) as read`);
+        // Update the unread count
+        setUnreadMessageCount(0);
       }
     }
-  }, [userMessages, user?.email, notifications, markAsRead]);
+  }, [userMessages, user?.email, notifications, markAsRead, markMessageAsRead]);
 
   const handleMarkAsRead = async (messageId: string) => {
     try {
@@ -197,6 +207,12 @@ const MessagesPage = () => {
       relatedNotifications.forEach(notification => {
         markAsRead(notification.id);
       });
+      
+      // Update the unread count
+      if (user?.email) {
+        const updatedCount = getUnreadMessageCount(user.email);
+        setUnreadMessageCount(updatedCount);
+      }
       
       toast.success('Message marked as read');
     } catch (error) {
@@ -214,9 +230,6 @@ const MessagesPage = () => {
       return 'Unknown';
     }
   };
-
-  // Calculate unread count correctly by filtering messages for current user
-  const unreadCount = userMessages.filter(msg => !msg.read).length;
 
   // Function to download a file
   const handleDownloadFile = async (fileUrl: string, fileName: string) => {
@@ -314,9 +327,9 @@ const MessagesPage = () => {
             <CardDescription>Your received messages</CardDescription>
           </div>
           <div className="flex items-center gap-2">
-            {unreadCount > 0 && (
+            {unreadMessageCount > 0 && (
               <div className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
-                {unreadCount} unread
+                {unreadMessageCount} unread
               </div>
             )}
             <Button 

@@ -20,12 +20,14 @@ import AddExpenseForm from '@/components/user/AddExpenseForm';
 import MyExpensesTable from '@/components/user/MyExpensesTable';
 import MessagesPage from '@/components/user/MessagesPage';
 import OverdueExpenses from '@/components/user/OverdueExpenses';
-import { LogOut, Wallet, User, Calendar, Building, Hash, Camera, Mail, AlertTriangle } from 'lucide-react';
+import { Bell, LogOut, Wallet, User, Calendar, Building, Hash, Camera, Mail, AlertTriangle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const UserDashboard = () => {
   const { user, logout } = useAuth();
-  const { employees, updateEmployee, refreshData } = useData();
+  const { employees, updateEmployee, refreshData, messages, getUnreadMessageCount } = useData();
   const { unreadCount } = useNotification();
+  const navigate = useNavigate();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [name, setName] = useState('');
   const [sector, setSector] = useState('');
@@ -33,6 +35,7 @@ const UserDashboard = () => {
   const [status, setStatus] = useState<'employee' | 'founder' | 'manager' | 'intern' | 'admin'>('employee');
   const [profilePicture, setProfilePicture] = useState<string>('');
   const [profilePictureFile, setProfilePictureFile] = useState<File | null>(null);
+  const [unreadMessageCount, setUnreadMessageCount] = useState<number>(0);
 
   // Get current user data
   const currentUser = employees.find(emp => emp.email === user?.email);
@@ -53,6 +56,14 @@ const UserDashboard = () => {
     refreshData();
   }, []);
 
+  // Calculate unread message count for the current user
+  useEffect(() => {
+    if (user?.email) {
+      const count = getUnreadMessageCount(user.email);
+      setUnreadMessageCount(count);
+    }
+  }, [user?.email, messages, getUnreadMessageCount]);
+
   const handleLogout = async () => {
     try {
       await logout();
@@ -60,6 +71,14 @@ const UserDashboard = () => {
       // No need to manually navigate to /login
     } catch (error) {
       console.error('Failed to logout:', error);
+    }
+  };
+
+  const handleNotificationClick = () => {
+    // For user dashboard, we'll switch to the messages tab since that's where notifications are
+    const messagesTab = document.querySelector('[value="messages"]');
+    if (messagesTab) {
+      (messagesTab as HTMLButtonElement).click();
     }
   };
 
@@ -108,148 +127,143 @@ const UserDashboard = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b bg-card">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-primary rounded-xl">
-                <Wallet className="w-6 h-6 text-primary-foreground" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold">My Dashboard</h1>
-                <p className="text-sm text-muted-foreground">Welcome, {user?.email || 'User'}</p>
-              </div>
+      {/* Navbar */}
+      <header className="border-b bg-card fixed top-0 left-0 right-0 h-16 z-30">
+        <div className="container mx-auto px-4 h-full flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-primary rounded-xl">
+              <Wallet className="w-5 h-5 text-primary-foreground" />
             </div>
-            <div className="flex items-center gap-3">
-              <Dialog open={isProfileOpen} onOpenChange={setIsProfileOpen}>
-                <DialogTrigger asChild>
-                  <Button variant="ghost" className="relative h-10 w-10 rounded-full p-0">
-                    <Avatar className="h-10 w-10">
-                      <AvatarImage src={profilePicture || ''} alt={user?.email || ''} />
-                      <AvatarFallback>{getUserInitials(user?.email)}</AvatarFallback>
-                    </Avatar>
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-[425px]">
-                  <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2">
-                      <User className="h-5 w-5" />
-                      Update Profile
-                    </DialogTitle>
-                  </DialogHeader>
-                  <form onSubmit={handleProfileUpdate} className="space-y-4">
-                    <div className="flex flex-col items-center gap-4">
-                      <div className="relative">
-                        <Avatar className="h-24 w-24">
-                          <AvatarImage src={profilePicture || ''} alt="Profile" />
-                          <AvatarFallback className="text-2xl">
-                            {name ? name.charAt(0).toUpperCase() : getUserInitials(user?.email)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <label 
-                          htmlFor="profile-picture" 
-                          className="absolute bottom-0 right-0 bg-primary rounded-full p-2 cursor-pointer hover:bg-primary/90 transition-colors"
-                        >
-                          <Camera className="h-4 w-4 text-primary-foreground" />
-                        </label>
-                      </div>
-                      <Input
-                        id="profile-picture"
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={handleProfilePictureChange}
-                      />
-                      <Button 
-                        type="button" 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => document.getElementById('profile-picture')?.click()}
+            <div>
+              <h1 className="text-lg font-bold">My Dashboard</h1>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {/* Profile Avatar */}
+            <Dialog open={isProfileOpen} onOpenChange={setIsProfileOpen}>
+              <DialogTrigger asChild>
+                <Button variant="ghost" className="relative h-10 w-10 rounded-full p-0">
+                  <Avatar className="h-10 w-10">
+                    <AvatarImage src={profilePicture || ''} alt={user?.email || ''} />
+                    <AvatarFallback>{getUserInitials(user?.email)}</AvatarFallback>
+                  </Avatar>
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2 text-lg">
+                    <User className="h-5 w-5" />
+                    Update Profile
+                  </DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleProfileUpdate} className="space-y-4">
+                  <div className="flex flex-col items-center gap-4">
+                    <div className="relative">
+                      <Avatar className="h-20 w-20">
+                        <AvatarImage src={profilePicture || ''} alt="Profile" />
+                        <AvatarFallback className="text-xl">
+                          {name ? name.charAt(0).toUpperCase() : getUserInitials(user?.email)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <label 
+                        htmlFor="profile-picture" 
+                        className="absolute bottom-0 right-0 bg-primary rounded-full p-1.5 cursor-pointer hover:bg-primary/90 transition-colors"
                       >
-                        Change Photo
-                      </Button>
+                        <Camera className="h-4 w-4 text-primary-foreground" />
+                      </label>
                     </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="name">Name</Label>
-                      <div className="relative">
-                        <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          id="name"
-                          placeholder="Enter your name"
-                          value={name}
-                          onChange={(e) => setName(e.target.value)}
-                          className="pl-10"
-                        />
-                      </div>
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      size="sm"
+                      className="h-10 text-sm"
+                      onClick={() => document.getElementById('profile-picture')?.click()}
+                    >
+                      Change Photo
+                    </Button>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="name" className="text-sm">Name</Label>
+                    <div className="relative">
+                      <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="name"
+                        placeholder="Enter your name"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        className="pl-10 text-sm h-10"
+                      />
                     </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="sector">Employee Sector</Label>
-                      <div className="relative">
-                        <Building className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          id="sector"
-                          placeholder="Enter your sector"
-                          value={sector}
-                          onChange={(e) => setSector(e.target.value)}
-                          className="pl-10"
-                        />
-                      </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="sector" className="text-sm">Employee Sector</Label>
+                    <div className="relative">
+                      <Building className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="sector"
+                        placeholder="Enter your sector"
+                        value={sector}
+                        onChange={(e) => setSector(e.target.value)}
+                        className="pl-10 text-sm h-10"
+                      />
                     </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="age">Age</Label>
-                      <div className="relative">
-                        <Hash className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          id="age"
-                          type="number"
-                          placeholder="Enter your age"
-                          value={age}
-                          onChange={(e) => setAge(e.target.value)}
-                          className="pl-10"
-                        />
-                      </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="age" className="text-sm">Age</Label>
+                    <div className="relative">
+                      <Hash className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="age"
+                        type="number"
+                        placeholder="Enter your age"
+                        value={age}
+                        onChange={(e) => setAge(e.target.value)}
+                        className="pl-10 text-sm h-10"
+                      />
                     </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="status">User Status</Label>
-                      <Select value={status} onValueChange={(value: 'employee' | 'founder' | 'manager' | 'intern' | 'admin') => setStatus(value)}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select user status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="employee">Employee</SelectItem>
-                          <SelectItem value="founder">Founder</SelectItem>
-                          <SelectItem value="manager">Manager</SelectItem>
-                          <SelectItem value="intern">Intern</SelectItem>
-                          <SelectItem value="admin">Admin</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    
-                    <div className="flex flex-col sm:flex-row justify-end gap-2">
-                      <Button type="button" variant="outline" onClick={() => setIsProfileOpen(false)}>
-                        Cancel
-                      </Button>
-                      <Button type="submit">Update Profile</Button>
-                    </div>
-                  </form>
-                </DialogContent>
-              </Dialog>
-              
-              <Button onClick={handleLogout} variant="outline" className="gap-2">
-                <LogOut className="w-4 h-4" />
-                <span className="hidden sm:inline">Logout</span>
-              </Button>
-            </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="status" className="text-sm">User Status</Label>
+                    <Select value={status} onValueChange={(value: 'employee' | 'founder' | 'manager' | 'intern' | 'admin') => setStatus(value)}>
+                      <SelectTrigger className="text-sm h-10">
+                        <SelectValue placeholder="Select user status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="employee">Employee</SelectItem>
+                        <SelectItem value="founder">Founder</SelectItem>
+                        <SelectItem value="manager">Manager</SelectItem>
+                        <SelectItem value="intern">Intern</SelectItem>
+                        <SelectItem value="admin">Admin</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="flex flex-col sm:flex-row justify-end gap-2">
+                    <Button type="button" variant="outline" className="h-10" onClick={() => setIsProfileOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button type="submit" className="h-10">Update Profile</Button>
+                  </div>
+                </form>
+              </DialogContent>
+            </Dialog>
+            
+            {/* Logout Button */}
+            <Button onClick={handleLogout} variant="outline" className="h-10 gap-1 px-3 text-sm">
+              <LogOut className="w-4 h-4" />
+              <span className="hidden sm:inline">Logout</span>
+            </Button>
           </div>
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8">
-        <Tabs defaultValue="expenses" className="w-full">
+      {/* Main Content with padding to account for fixed navbar */}
+      <main className="container mx-auto px-4 pt-16 pb-8">
+        <Tabs defaultValue="expenses" className="w-full mt-6">
           <TabsList className="grid w-full grid-cols-1 sm:grid-cols-3">
             <TabsTrigger value="expenses" className="flex items-center gap-2">
               <Wallet className="w-4 h-4" />
@@ -265,12 +279,12 @@ const UserDashboard = () => {
               <Mail className="w-4 h-4" />
               <span className="hidden sm:inline">Messages</span>
               <span className="sm:hidden">Msg</span>
-              {unreadCount > 0 && (
+              {unreadMessageCount > 0 && (
                 <Badge 
                   variant="destructive" 
                   className="absolute -top-2 -right-2 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs"
                 >
-                  {unreadCount}
+                  {unreadMessageCount}
                 </Badge>
               )}
             </TabsTrigger>

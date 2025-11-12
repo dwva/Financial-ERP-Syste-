@@ -304,8 +304,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const userDoc = querySnapshot.docs[0];
       const docRef = doc(db, 'employees', userDoc.id);
       
-      // Update the user document to set passwordResetRequired to false
+      // Update the user document with the new password and set passwordResetRequired to false
       await updateDoc(docRef, {
+        password: newPassword, // Store the new password
         passwordResetRequired: false
       });
       

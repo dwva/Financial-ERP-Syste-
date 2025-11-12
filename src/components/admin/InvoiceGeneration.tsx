@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'react-toastify';
-import { Download, FileText, Search, History, Edit } from 'lucide-react';
+import { Download, FileText, Search, History } from 'lucide-react';
 import { useData } from '@/contexts/DataContext';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -49,7 +49,6 @@ const InvoiceGeneration = ({ onNavigateToHistory }: InvoiceGenerationProps) => {
     businessPhone: '+91 98765 43210',
     businessGST: 'GSTIN: 27AABCCDDEEFFG'
   });
-  const [isEditingBusinessInfo, setIsEditingBusinessInfo] = useState(false);
   const [invoiceItems, setInvoiceItems] = useState<InvoiceItem[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [invoiceNumber, setInvoiceNumber] = useState(`INV-${Date.now().toString().slice(-6)}`);
@@ -362,122 +361,43 @@ const InvoiceGeneration = ({ onNavigateToHistory }: InvoiceGenerationProps) => {
           <div className="border rounded-lg p-4 bg-muted">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold">Business Information (Static)</h3>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => setIsEditingBusinessInfo(!isEditingBusinessInfo)}
-              >
-                {isEditingBusinessInfo ? 'Cancel' : 'Edit'}
-              </Button>
+              {/* Removed edit button since editing functionality was removed */}
             </div>
-            {isEditingBusinessInfo ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Business Name</Label>
-                  <Input 
-                    value={invoiceData.businessName}
-                    onChange={(e) => handleInputChange('businessName', e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Tagline</Label>
-                  <Input 
-                    value={invoiceData.businessTagline}
-                    onChange={(e) => handleInputChange('businessTagline', e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Address</Label>
-                  <Input 
-                    value={invoiceData.businessAddress}
-                    onChange={(e) => handleInputChange('businessAddress', e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>City, State & ZIP</Label>
-                  <Input 
-                    value={invoiceData.businessCity}
-                    onChange={(e) => handleInputChange('businessCity', e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Country</Label>
-                  <Input 
-                    value={invoiceData.businessCountry}
-                    onChange={(e) => handleInputChange('businessCountry', e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Email</Label>
-                  <Input 
-                    value={invoiceData.businessEmail}
-                    onChange={(e) => handleInputChange('businessEmail', e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Phone</Label>
-                  <Input 
-                    value={invoiceData.businessPhone}
-                    onChange={(e) => handleInputChange('businessPhone', e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>GST Number</Label>
-                  <Input 
-                    value={invoiceData.businessGST}
-                    onChange={(e) => handleInputChange('businessGST', e.target.value)}
-                  />
-                </div>
-                <div className="col-span-2 flex justify-end gap-2">
-                  <Button 
-                    variant="outline" 
-                    onClick={() => setIsEditingBusinessInfo(false)}
-                  >
-                    Cancel
-                  </Button>
-                  <Button 
-                    onClick={() => setIsEditingBusinessInfo(false)}
-                  >
-                    Save
-                  </Button>
-                </div>
+            {/* Removed editing functionality and kept only display mode */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Business Name</Label>
+                <div className="p-2 bg-white rounded border">{invoiceData.businessName}</div>
               </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Business Name</Label>
-                  <div className="p-2 bg-white rounded border">{invoiceData.businessName}</div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Tagline</Label>
-                  <div className="p-2 bg-white rounded border">{invoiceData.businessTagline}</div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Address</Label>
-                  <div className="p-2 bg-white rounded border">{invoiceData.businessAddress}</div>
-                </div>
-                <div className="space-y-2">
-                  <Label>City, State & ZIP</Label>
-                  <div className="p-2 bg-white rounded border">{invoiceData.businessCity}</div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Country</Label>
-                  <div className="p-2 bg-white rounded border">{invoiceData.businessCountry}</div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Email</Label>
-                  <div className="p-2 bg-white rounded border">{invoiceData.businessEmail}</div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Phone</Label>
-                  <div className="p-2 bg-white rounded border">{invoiceData.businessPhone}</div>
-                </div>
-                <div className="space-y-2">
-                  <Label>GST Number</Label>
-                  <div className="p-2 bg-white rounded border">{invoiceData.businessGST}</div>
-                </div>
+              <div className="space-y-2">
+                <Label>Tagline</Label>
+                <div className="p-2 bg-white rounded border">{invoiceData.businessTagline}</div>
               </div>
-            )}
+              <div className="space-y-2">
+                <Label>Address</Label>
+                <div className="p-2 bg-white rounded border">{invoiceData.businessAddress}</div>
+              </div>
+              <div className="space-y-2">
+                <Label>City, State & ZIP</Label>
+                <div className="p-2 bg-white rounded border">{invoiceData.businessCity}</div>
+              </div>
+              <div className="space-y-2">
+                <Label>Country</Label>
+                <div className="p-2 bg-white rounded border">{invoiceData.businessCountry}</div>
+              </div>
+              <div className="space-y-2">
+                <Label>Email</Label>
+                <div className="p-2 bg-white rounded border">{invoiceData.businessEmail}</div>
+              </div>
+              <div className="space-y-2">
+                <Label>Phone</Label>
+                <div className="p-2 bg-white rounded border">{invoiceData.businessPhone}</div>
+              </div>
+              <div className="space-y-2">
+                <Label>GST Number</Label>
+                <div className="p-2 bg-white rounded border">{invoiceData.businessGST}</div>
+              </div>
+            </div>
           </div>
 
           {/* Associated Expenses Section */}
@@ -724,72 +644,18 @@ const InvoiceGeneration = ({ onNavigateToHistory }: InvoiceGenerationProps) => {
                     </div>
                     <div className="flex items-center gap-2">
                       <h1 className="text-3xl font-bold text-blue-700">{invoiceData.businessName}</h1>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        onClick={() => setIsEditingBusinessInfo(!isEditingBusinessInfo)}
-                        className="h-6 w-6 p-0"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </Button>
                     </div>
-                    {isEditingBusinessInfo ? (
-                      <div className="space-y-2 mt-2">
-                        <Input 
-                          value={invoiceData.businessName}
-                          onChange={(e) => handleInputChange('businessName', e.target.value)}
-                          placeholder="Business Name"
-                          className="text-lg font-bold"
-                        />
-                        <Input 
-                          value={invoiceData.businessTagline}
-                          onChange={(e) => handleInputChange('businessTagline', e.target.value)}
-                          placeholder="Business Tagline"
-                        />
-                        <Input 
-                          value={invoiceData.businessAddress}
-                          onChange={(e) => handleInputChange('businessAddress', e.target.value)}
-                          placeholder="Business Address"
-                        />
-                        <Input 
-                          value={invoiceData.businessCity}
-                          onChange={(e) => handleInputChange('businessCity', e.target.value)}
-                          placeholder="City, State ZIP"
-                        />
-                        <Input 
-                          value={invoiceData.businessCountry}
-                          onChange={(e) => handleInputChange('businessCountry', e.target.value)}
-                          placeholder="Country"
-                        />
-                        <Input 
-                          value={invoiceData.businessEmail}
-                          onChange={(e) => handleInputChange('businessEmail', e.target.value)}
-                          placeholder="Email"
-                        />
-                        <Input 
-                          value={invoiceData.businessPhone}
-                          onChange={(e) => handleInputChange('businessPhone', e.target.value)}
-                          placeholder="Phone"
-                        />
-                        <Input 
-                          value={invoiceData.businessGST}
-                          onChange={(e) => handleInputChange('businessGST', e.target.value)}
-                          placeholder="GST Information"
-                        />
+                    <>
+                      <p className="text-gray-600 mt-1">{invoiceData.businessTagline}</p>
+                      <div className="mt-4 text-sm text-gray-600">
+                        <p>{invoiceData.businessAddress}</p>
+                        <p>{invoiceData.businessCity}</p>
+                        <p>{invoiceData.businessCountry}</p>
+                        <p className="mt-1">Email: {invoiceData.businessEmail}</p>
+                        <p>Phone: {invoiceData.businessPhone}</p>
+                        <p>{invoiceData.businessGST}</p>
                       </div>
-                    ) : (
-                      <>
-                        <p className="text-gray-600 mt-1">{invoiceData.businessTagline}</p>
-                        <div className="mt-4 text-sm text-gray-600">
-                          <p>{invoiceData.businessAddress}</p>
-                          <p>{invoiceData.businessCity}</p>
-                          <p>{invoiceData.businessCountry}</p>
-                          <p className="mt-1">Email: {invoiceData.businessEmail}</p>
-                          <p>Phone: {invoiceData.businessPhone}</p>
-                          <p>{invoiceData.businessGST}</p>
-                        </div>
-                      </>
-                    )}
+                    </>
                   </div>
                   <div className="text-right">
                     <h2 className="text-3xl font-bold text-gray-800">INVOICE</h2>

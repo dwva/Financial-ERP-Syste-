@@ -50,21 +50,21 @@ const PasswordReset = ({ email, onPasswordReset, onCancel }: PasswordResetProps)
         <CardHeader className="space-y-1">
           <div className="flex justify-center mb-4">
             <div className="p-3 bg-primary rounded-full">
-              <Lock className="w-6 h-6 text-primary-foreground" />
+              <Lock className="w-5 h-5 text-primary-foreground" />
             </div>
           </div>
-          <CardTitle className="text-2xl text-center">Reset Your Password</CardTitle>
-          <CardDescription className="text-center">
+          <CardTitle className="text-xl text-center">Reset Your Password</CardTitle>
+          <CardDescription className="text-center text-sm">
             Your account requires a password reset. Please create a new password.
           </CardDescription>
-          <CardDescription className="text-center text-sm font-medium mt-2">
+          <CardDescription className="text-center text-xs font-medium mt-2">
             Account: {email}
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="newPassword">New Password</Label>
+              <Label htmlFor="newPassword" className="text-sm">New Password</Label>
               <Input
                 id="newPassword"
                 type="password"
@@ -73,10 +73,11 @@ const PasswordReset = ({ email, onPasswordReset, onCancel }: PasswordResetProps)
                 onChange={(e) => setNewPassword(e.target.value)}
                 required
                 autoComplete="new-password"
+                className="text-sm h-10"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirm Password</Label>
+              <Label htmlFor="confirmPassword" className="text-sm">Confirm Password</Label>
               <Input
                 id="confirmPassword"
                 type="password"
@@ -85,17 +86,18 @@ const PasswordReset = ({ email, onPasswordReset, onCancel }: PasswordResetProps)
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
                 autoComplete="new-password"
+                className="text-sm h-10"
               />
             </div>
           </CardContent>
           <CardFooter className="flex flex-col space-y-4">
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button type="submit" className="w-full h-10" disabled={loading}>
               {loading ? 'Resetting Password...' : 'Reset Password'}
             </Button>
             <Button 
               type="button" 
               variant="outline" 
-              className="w-full" 
+              className="w-full h-10" 
               onClick={onCancel}
               disabled={loading}
             >

@@ -110,12 +110,14 @@ const Login = () => {
       <Card className="w-full max-w-md shadow-lg">
         <CardHeader className="space-y-1">
           <div className="flex justify-center mb-4">
-            <div className="p-3 bg-primary rounded-full">
-              <Lock className="w-6 h-6 text-primary-foreground" />
-            </div>
+            <img 
+              src="/mio[1].png" 
+              alt="Logo" 
+              className="w-16 h-16 object-contain"
+            />
           </div>
-          <CardTitle className="text-2xl text-center">Financial ERP System</CardTitle>
-          <CardDescription className="text-center">
+          <CardTitle className="text-xl text-center">Financial ERP System</CardTitle>
+          <CardDescription className="text-center text-sm">
             Sign in to your account
           </CardDescription>
         </CardHeader>
@@ -123,7 +125,7 @@ const Login = () => {
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="identifier">Email, Mobile Number, or Username</Label>
+              <Label htmlFor="identifier" className="text-sm">Email, Mobile Number, or Username</Label>
               <div className="relative">
                 <div className="absolute left-3 top-1/2 transform -translate-y-1/2 flex items-center">
                   <Mail className="w-4 h-4 text-muted-foreground" />
@@ -134,14 +136,14 @@ const Login = () => {
                   placeholder="Enter your email, mobile number, or username"
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 text-sm h-10"
                   required
                   autoComplete="username"
                 />
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password" className="text-sm">Password</Label>
               <div className="relative">
                 <div className="absolute left-3 top-1/2 transform -translate-y-1/2 flex items-center">
                   <Lock className="w-4 h-4 text-muted-foreground" />
@@ -152,7 +154,7 @@ const Login = () => {
                   placeholder="Enter your password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 text-sm h-10"
                   required
                   autoComplete="current-password"
                 />
@@ -160,7 +162,7 @@ const Login = () => {
             </div>
           </CardContent>
           <CardFooter className="flex flex-col space-y-4">
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button type="submit" className="w-full h-10" disabled={loading}>
               {loading ? 'Signing in...' : 'Sign In'}
             </Button>
           </CardFooter>

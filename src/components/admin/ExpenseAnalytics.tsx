@@ -85,6 +85,60 @@ const ExpenseAnalytics = () => {
     }, [] as { month: string; amount: number }[]);
   }, [filteredExpenses]);
 
+  // Group expenses by client monthly
+  const expensesByClientMonthly = useMemo(() => {
+    // Filter for January - June 2024
+    const janJun2024Expenses = expenses.filter(expense => {
+      const date = new Date(expense.timestamp);
+      const year = date.getFullYear();
+      const month = date.getMonth(); // 0-11 (0 = January)
+      return year === 2024 && month >= 0 && month <= 5; // January (0) to June (5)
+    });
+    
+    // Group by client and month
+    const result: { clientName: string; month: string; amount: number }[] = [];
+    
+    janJun2024Expenses.forEach(expense => {
+      const clientName = expense.clientName || 'No Client';
+      const date = new Date(expense.timestamp);
+      const month = date.toLocaleDateString('en-US', { month: 'short' }); // Jan, Feb, etc.
+      
+      const existing = result.find(item => item.clientName === clientName && item.month === month);
+      if (existing) {
+        existing.amount += expense.amount;
+      } else {
+        result.push({ clientName, month, amount: expense.amount });
+      }
+    });
+    
+    return result;
+  }, [expenses]);
+  
+  // Get unique clients for the bar chart
+  const uniqueClients = useMemo(() => {
+    return Array.from(new Set(expensesByClientMonthly.map(item => item.clientName)));
+  }, [expensesByClientMonthly]);
+  
+  // Get unique months for the bar chart
+  const chartMonths = useMemo(() => {
+    return Array.from(new Set(expensesByClientMonthly.map(item => item.month))).sort((a, b) => {
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
+      return months.indexOf(a) - months.indexOf(b);
+    });
+  }, [expensesByClientMonthly]);
+  
+  // Prepare data for the bar chart
+  const barChartData = useMemo(() => {
+    return chartMonths.map(month => {
+      const data: any = { month };
+      uniqueClients.forEach(client => {
+        const item = expensesByClientMonthly.find(i => i.clientName === client && i.month === month);
+        data[client] = item ? item.amount : 0;
+      });
+      return data;
+    });
+  }, [chartMonths, uniqueClients, expensesByClientMonthly]);
+
   const COLORS = ['hsl(214 84% 56%)', 'hsl(152 69% 31%)', 'hsl(38 92% 50%)', 'hsl(0 84% 60%)', 'hsl(142 76% 36%)'];
 
   const formatAmount = (amount: number) => {
@@ -215,16 +269,17 @@ const ExpenseAnalytics = () => {
       </div>
 
       {/* Charts */}
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-2">
+        {/* Bar Chart - Expenses by Client Monthly */}
         <Card>
           <CardHeader>
-            <CardTitle>Expenses by Month</CardTitle>
-            <CardDescription>Monthly expense trends</CardDescription>
+            <CardTitle>Expenses by Client</CardTitle>
+            <CardDescription>January - June 2024</CardDescription>
           </CardHeader>
           <CardContent>
-            {expensesByMonth.length > 0 ? (
+            {barChartData.length > 0 ? (
               <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={expensesByMonth}>
+                <BarChart data={barChartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                   <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" />
                   <YAxis stroke="hsl(var(--muted-foreground))" />
@@ -236,17 +291,27 @@ const ExpenseAnalytics = () => {
                       borderRadius: '8px'
                     }}
                   />
-                  <Bar dataKey="amount" fill="hsl(214 84% 56%)" radius={[8, 8, 0, 0]} />
+                  {uniqueClients.map((client, index) => (
+                    <Bar 
+                      key={client} 
+                      dataKey={client} 
+                      fill={COLORS[index % COLORS.length]} 
+                      radius={[4, 4, 0, 0]} 
+                      name={client}
+                    />
+                  ))}
+                  <Legend />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
               <div className="flex items-center justify-center h-[300px] text-muted-foreground">
-                No expense data available
+                No expense data available for Jan-Jun 2024
               </div>
             )}
           </CardContent>
         </Card>
 
+        {/* Pie Chart - Expenses by Employee */}
         <Card>
           <CardHeader>
             <CardTitle>Expenses by Employee</CardTitle>

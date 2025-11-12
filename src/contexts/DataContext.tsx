@@ -74,6 +74,10 @@ export interface Expense {
   serviceName?: string; // Add serviceName field
   overdue?: boolean; // Add overdue field
   created_at?: string;
+  // Partial payment fields
+  partialPayment?: boolean;
+  partialAmount?: number;
+  partialReceived?: boolean;
   // Additional fields that can be added later
   [key: string]: any;
 }
@@ -91,6 +95,7 @@ export interface Invoice {
   id: string;
   invoiceNumber: string;
   date: string;
+  dueDate?: string; // Add optional dueDate field
   companyName: string;
   businessName: string;
   businessTagline: string;
@@ -113,9 +118,9 @@ export interface ProfitLossReport {
   period: 'monthly' | 'yearly';
   month?: string;
   year: string;
-  revenue: number;
-  expenses: number;
-  profit: number;
+  // Remove revenue, expenses, and profit fields from the interface
+  // Add annualIncome field
+  annualIncome?: number;
   createdAt: string;
   reportData: any[];
 }
@@ -176,6 +181,8 @@ interface DataContextType {
   updateProfitLossReport: (id: string, report: Partial<ProfitLossReport>) => Promise<void>;
   deleteProfitLossReport: (id: string) => Promise<void>;
   getAllMessages: () => Promise<any[]>;
+  // Add function to get unread message count for a user
+  getUnreadMessageCount: (userId: string) => number;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -206,14 +213,15 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('Refreshing data...');
       
       // Fetch all data concurrently
-      const [employeesData, expensesData, invoicesData, serviceChargesData, invoiceHistoryData, profitLossReportsData, dropdownData] = await Promise.all([
+      const [employeesData, expensesData, invoicesData, serviceChargesData, invoiceHistoryData, profitLossReportsData, dropdownData, messagesData] = await Promise.all([
         getEmployees(),
         getExpenses(),
         getInvoices(),
         getServiceCharges(),
         getInvoiceHistory(),
         getProfitLossReports(),
-        getDropdownData()
+        getDropdownData(),
+        getAllMessages() // Add this line to fetch messages
       ]);
 
       console.log('Data fetched:', {
@@ -223,7 +231,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         serviceCharges: serviceChargesData.length,
         invoiceHistory: invoiceHistoryData.length,
         profitLossReports: profitLossReportsData.length,
-        dropdownData: dropdownData.length
+        dropdownData: dropdownData.length,
+        messages: messagesData.length // Add this line
       });
 
       setEmployees(employeesData);
@@ -233,6 +242,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setInvoiceHistory(invoiceHistoryData);
       setProfitLossReports(profitLossReportsData);
       setDropdownData(dropdownData);
+      setMessages(messagesData); // Add this line
 
       // Set up real-time listeners
       if (!unsubscribeExpenses) {
@@ -636,6 +646,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const getUnreadMessageCount = (userId: string): number => {
+    return messages.filter(msg => msg.receiverId === userId && !msg.read).length;
+  };
+
   return (
     <DataContext.Provider
       value={{
@@ -646,7 +660,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         invoiceHistory,
         profitLossReports,
         messages,
-        dropdownData, // Add this line
+        dropdownData,
         loading,
         error,
         addEmployee,
@@ -658,12 +672,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         refreshData,
         deleteExpense,
         addInvoice,
-        addInvoiceHistory,
-        deleteInvoiceHistory,
         addServiceCharge,
         updateServiceCharge,
         deleteServiceCharge,
-        // Add dropdown data functions to provider value
+        addInvoiceHistory,
+        deleteInvoiceHistory,
+        // Dropdown data functions
         addDropdownData,
         updateDropdownData,
         deleteDropdownData,
@@ -679,6 +693,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         updateProfitLossReport,
         deleteProfitLossReport,
         getAllMessages,
+        // Add the new function
+        getUnreadMessageCount
       }}
     >
       {children}

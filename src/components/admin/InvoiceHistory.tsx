@@ -4,10 +4,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useData } from '@/contexts/DataContext';
-import { Search, Eye, Trash2, ArrowLeft, Copy } from 'lucide-react';
+import { Search, Eye, Trash2, ArrowLeft, Copy, Download } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'react-toastify';
 import AlertDialog from './AlertDialog'; // Added import
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 interface InvoiceHistoryProps {
   onBackToGeneration?: () => void;
@@ -40,6 +42,208 @@ const InvoiceHistory = ({ onBackToGeneration }: InvoiceHistoryProps) => {
       currency: 'INR',
       minimumFractionDigits: 2
     }).format(amount);
+  };
+
+  // Function to download invoice as PDF
+  const downloadInvoicePDF = async (invoice: any) => {
+    try {
+      // Create a temporary div to render the invoice
+      const invoiceDiv = document.createElement('div');
+      invoiceDiv.style.position = 'absolute';
+      invoiceDiv.style.left = '-9999px';
+      invoiceDiv.style.width = '800px';
+      invoiceDiv.style.padding = '32px';
+      invoiceDiv.style.backgroundColor = 'white';
+      invoiceDiv.style.fontFamily = 'Arial, sans-serif';
+      
+      // Generate invoice HTML
+      invoiceDiv.innerHTML = `
+        <div style="width: 100%; max-width: 800px; margin: 0 auto; padding: 32px; background: white;">
+          <!-- Company Header -->
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 24px; border-bottom: 2px solid #ccc;">
+            <div>
+              <!-- Logo -->
+              <div style="margin-bottom: 16px;">
+                <img src="/Black SD.png" alt="Company Logo" style="height: 96px; object-fit: contain;" />
+              </div>
+              <h1 style="font-size: 24px; font-weight: bold; color: #2563eb;">${invoice.businessName || 'Financial ERP'}</h1>
+              <p style="color: #4b5563; margin-top: 4px;">${invoice.businessTagline || 'Business Solutions'}</p>
+              <div style="margin-top: 16px; font-size: 14px; color: #4b5563;">
+                <p>${invoice.businessAddress || '123 Corporate Avenue'}</p>
+                <p>${invoice.businessCity || 'Mumbai, Maharashtra 400001'}</p>
+                <p>${invoice.businessCountry || 'India'}</p>
+                <p style="margin-top: 4px;">Email: ${invoice.businessEmail || 'info@financiaerpsys.com'}</p>
+                <p>Phone: ${invoice.businessPhone || '+91 98765 43210'}</p>
+                ${invoice.businessGST ? `<p>${invoice.businessGST}</p>` : ''}
+              </div>
+            </div>
+            <div style="text-align: right;">
+              <h2 style="font-size: 24px; font-weight: bold; color: #1f2937;">INVOICE</h2>
+              <div style="margin-top: 16px; font-size: 14px;">
+                <p style="font-weight: 600;">Invoice Number:</p>
+                <p style="font-size: 16px;">${invoice.invoiceNumber}</p>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Invoice Info -->
+          <div style="display: flex; justify-content: space-between; padding: 24px 0;">
+            <div>
+              <h3 style="font-size: 16px; font-weight: 600; color: #1f2937;">BILL TO:</h3>
+              <p style="margin-top: 8px; font-weight: 500; color: #1f2937;">${invoice.companyName || 'Company Name'}</p>
+              ${invoice.candidateName ? `<p style="margin-top: 4px; color: #4b5563;">Candidate: ${invoice.candidateName}</p>` : ''}
+            </div>
+            <div style="text-align: right;">
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                <div style="text-align: left;">
+                  <p style="color: #4b5563;">Invoice Date:</p>
+                  <p style="font-weight: 500;">${format(new Date(invoice.date), 'dd/MM/yyyy')}</p>
+                </div>
+                <div style="text-align: left;">
+                  <p style="color: #4b5563;">Due Date:</p>
+                  <p style="font-weight: 500;">${invoice.dueDate ? format(new Date(invoice.dueDate), 'dd/MM/yyyy') : '-'}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Items Table -->
+          <div style="padding: 16px 0;">
+            <table style="width: 100%; border-collapse: collapse;">
+              <thead>
+                <tr style="background-color: #f3f4f6;">
+                  <th style="border: 1px solid #d1d5db; padding: 12px; text-align: left; font-weight: 600;">Description</th>
+                  <th style="border: 1px solid #d1d5db; padding: 12px; text-align: left; font-weight: 600;">Sector</th>
+                  <th style="border: 1px solid #d1d5db; padding: 12px; text-align: right; font-weight: 600;">Quantity</th>
+                  <th style="border: 1px solid #d1d5db; padding: 12px; text-align: right; font-weight: 600;">Unit Price</th>
+                  <th style="border: 1px solid #d1d5db; padding: 12px; text-align: right; font-weight: 600;">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${invoice.items?.map((item: any) => `
+                  <tr>
+                    <td style="border: 1px solid #d1d5db; padding: 12px;">${item.description}</td>
+                    <td style="border: 1px solid #d1d5db; padding: 12px;">${item.sector || 'N/A'}</td>
+                    <td style="border: 1px solid #d1d5db; padding: 12px; text-align: right;">${item.quantity || 1}</td>
+                    <td style="border: 1px solid #d1d5db; padding: 12px; text-align: right;">${formatAmount(item.amount)}</td>
+                    <td style="border: 1px solid #d1d5db; padding: 12px; text-align: right;">${formatAmount((item.amount || 0) * (item.quantity || 1))}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+          
+          <!-- Totals -->
+          <div style="margin-left: auto; width: 100%; max-width: 200px; padding-top: 16px;">
+            <table style="width: 100%; border-collapse: collapse;">
+              <tbody>
+                <tr>
+                  <td style="border: 1px solid #d1d5db; padding: 8px; text-align: right; color: #4b5563;">Subtotal:</td>
+                  <td style="border: 1px solid #d1d5db; padding: 8px; text-align: right; font-weight: 500;">${formatAmount(invoice.subtotal)}</td>
+                </tr>
+                ${invoice.discount > 0 ? `
+                  <tr>
+                    <td style="border: 1px solid #d1d5db; padding: 8px; text-align: right; color: #4b5563;">
+                      Discount (${invoice.discountPercentage || 0}%):
+                    </td>
+                    <td style="border: 1px solid #d1d5db; padding: 8px; text-align: right; font-weight: 500;">
+                      -${formatAmount(invoice.discount)}
+                    </td>
+                  </tr>
+                ` : ''}
+                <tr>
+                  <td style="border: 1px solid #d1d5db; padding: 8px; text-align: right; color: #4b5563;">
+                    Tax (${invoice.taxRate || 18}%):
+                  </td>
+                  <td style="border: 1px solid #d1d5db; padding: 8px; text-align: right; font-weight: 500;">
+                    ${formatAmount(invoice.tax)}
+                  </td>
+                </tr>
+                <tr style="background-color: #f3f4f6; font-weight: bold;">
+                  <td style="border: 1px solid #d1d5db; padding: 12px; text-align: right; font-size: 16px; color: #1f2937;">TOTAL:</td>
+                  <td style="border: 1px solid #d1d5db; padding: 12px; text-align: right; font-size: 16px; color: #2563eb;">
+                    ${formatAmount(invoice.total)}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          
+          <!-- Description -->
+          ${invoice.description ? `
+            <div style="padding-top: 24px; border-top: 1px solid #d1d5db;">
+              <h3 style="font-size: 16px; font-weight: 600; color: #1f2937;">Notes:</h3>
+              <p style="margin-top: 8px; color: #4b5563;">${invoice.description}</p>
+            </div>
+          ` : ''}
+          
+          <!-- Footer -->
+          <div style="padding-top: 32px; text-align: center; font-size: 12px; color: #6b7280; border-top: 1px solid #d1d5db; margin-top: 32px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px;">
+              <div style="text-align: left;">
+                <p style="font-weight: 600;">Authorized Signature</p>
+                <img src="/signature.png" alt="Authorized Signature" style="height: 64px; object-fit: contain; margin-top: 8px;" />
+              </div>
+              <div style="text-align: right;">
+                <p style="font-weight: 600;">For Slate Designers</p>
+                <p style="margin-top: 64px;">Authorized Signatory</p>
+              </div>
+            </div>
+            <p style="font-weight: 600;">Thank you for your business!</p>
+            <p style="margin-top: 4px;">Payment is due within 30 days</p>
+          </div>
+          
+          <!-- Additional Text Lines -->
+          <div style="padding-top: 16px; text-align: center; font-size: 10px; color: #6b7280;">
+            <p>This is a computer generated invoice</p>
+            <p>No signature required</p>
+          </div>
+        </div>
+      `;
+      
+      // Append to body
+      document.body.appendChild(invoiceDiv);
+      
+      // Use html2canvas to capture the div
+      const canvas = await html2canvas(invoiceDiv, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff'
+      });
+      
+      // Remove the temporary div
+      document.body.removeChild(invoiceDiv);
+      
+      // Create PDF using jsPDF
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const imgWidth = 210; // A4 width in mm
+      const pageHeight = 297; // A4 height in mm
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let heightLeft = imgHeight;
+      let position = 0;
+      
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+      
+      // Add additional pages if content is too long
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+      
+      // Save the PDF
+      const fileName = `invoice_${invoice.invoiceNumber}_${invoice.date}.pdf`;
+      pdf.save(fileName);
+      
+      toast.success('Invoice downloaded successfully!');
+    } catch (error) {
+      console.error('Error downloading invoice:', error);
+      toast.error('Failed to download invoice. Please try again.');
+    }
   };
 
   const viewInvoiceDetails = (invoice: any) => {
@@ -157,6 +361,14 @@ const InvoiceHistory = ({ onBackToGeneration }: InvoiceHistoryProps) => {
                       >
                         <Eye className="w-4 h-4 mr-1" />
                         View
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        onClick={() => downloadInvoicePDF(invoice)}
+                      >
+                        <Download className="w-4 h-4 mr-1" />
+                        Download
                       </Button>
                       <Button 
                         size="sm" 

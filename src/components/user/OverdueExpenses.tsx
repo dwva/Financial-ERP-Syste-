@@ -84,12 +84,13 @@ const FileViewerModal = ({
 };
 
 const OverdueExpenses = () => {
-  const { expenses, deleteExpense } = useData();
+  const { expenses, deleteExpense, invoiceHistory } = useData();
   const { user } = useAuth();
   const [editingExpense, setEditingExpense] = useState<any>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [fileViewerOpen, setFileViewerOpen] = useState<boolean>(false);
   const [currentFile, setCurrentFile] = useState<{ url: string; name: string } | null>(null);
+  const [activeTab, setActiveTab] = useState<'expenses' | 'invoices'>('expenses');
 
   // Filter for user's overdue expenses
   const overdueExpenses = useMemo(() => {
@@ -113,6 +114,35 @@ const OverdueExpenses = () => {
         return true;
       });
   }, [expenses, user?.email]);
+
+  // Filter for overdue invoices (for user's company)
+  const overdueInvoices = useMemo(() => {
+    if (!user?.email) return [];
+    
+    const now = new Date();
+    return invoiceHistory.filter(invoice => {
+      // Check if invoice has a due date and it's in the past
+      if (invoice.dueDate) {
+        const dueDate = new Date(invoice.dueDate);
+        if (dueDate < now) {
+          // Find associated expenses for this invoice (matching company name and user)
+          const associatedExpenses = expenses.filter(expense => 
+            expense.company === invoice.companyName && 
+            expense.userId === user?.email &&
+            expense.hasInvoice
+          );
+          
+          // Check if any associated expense is not received
+          const hasUnpaidExpenses = associatedExpenses.some(expense => 
+            (expense.status || 'pending') !== 'received'
+          );
+          
+          return hasUnpaidExpenses;
+        }
+      }
+      return false;
+    });
+  }, [invoiceHistory, expenses, user?.email]);
 
   const getFileIcon = (fileName: string | null) => {
     if (!fileName) return <FileText className="w-4 h-4" />;
@@ -141,6 +171,15 @@ const OverdueExpenses = () => {
     
     const today = new Date();
     const diffTime = today.getTime() - dueDate.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    return diffDays > 0 ? diffDays : 0;
+  };
+
+  const calculateDaysInvoiceOverdue = (dueDate: string) => {
+    const invoiceDueDate = new Date(dueDate);
+    const today = new Date();
+    const diffTime = today.getTime() - invoiceDueDate.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     
     return diffDays > 0 ? diffDays : 0;
@@ -192,138 +231,227 @@ const OverdueExpenses = () => {
     <>
       <Card>
         <CardHeader>
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-orange-100 rounded-lg">
-              <AlertTriangle className="w-5 h-5 text-orange-500" />
-            </div>
-            <div>
-              <CardTitle>My Overdue Expenses</CardTitle>
-              <CardDescription>
-                Expenses that have been marked as overdue
-              </CardDescription>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-orange-100 rounded-lg">
+                <AlertTriangle className="w-5 h-5 text-orange-500" />
+              </div>
+              <div>
+                <CardTitle>My Overdue Expenses & Invoices</CardTitle>
+                <CardDescription>
+                  Manage overdue expense records and invoice bills
+                </CardDescription>
+              </div>
             </div>
           </div>
-          <p className="text-sm text-muted-foreground mt-2">
-            {overdueExpenses.length} expense{overdueExpenses.length !== 1 ? 's' : ''} marked as overdue
-          </p>
+          
+          {/* Tab Navigation */}
+          <div className="flex border-b mt-4">
+            <button
+              className={`py-2 px-4 font-medium text-sm ${activeTab === 'expenses' ? 'border-b-2 border-orange-500 text-orange-500' : 'text-muted-foreground'}`}
+              onClick={() => setActiveTab('expenses')}
+            >
+              My Overdue Expenses ({overdueExpenses.length})
+            </button>
+            <button
+              className={`py-2 px-4 font-medium text-sm ${activeTab === 'invoices' ? 'border-b-2 border-orange-500 text-orange-500' : 'text-muted-foreground'}`}
+              onClick={() => setActiveTab('invoices')}
+            >
+              My Overdue Invoices ({overdueInvoices.length})
+            </button>
+          </div>
         </CardHeader>
         <CardContent>
-          <div className="border rounded-lg overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead>Client</TableHead>
-                  <TableHead>Company</TableHead>
-                  <TableHead>File</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Days Overdue</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {overdueExpenses.length === 0 ? (
+          {activeTab === 'expenses' ? (
+            // Overdue Expenses Table
+            <div className="border rounded-lg overflow-hidden">
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
-                      No overdue expenses found
-                    </TableCell>
+                    <TableHead>Amount</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead>Client</TableHead>
+                    <TableHead>Company</TableHead>
+                    <TableHead>File</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Days Overdue</TableHead>
+                    <TableHead>Actions</TableHead>
                   </TableRow>
-                ) : (
-                  overdueExpenses.map((expense) => {
-                    const daysOverdue = calculateDaysOverdue(expense.date, expense.overdueDays);
-                    
-                    return (
-                      <TableRow key={expense.id}>
-                        <TableCell>
-                          <Badge variant="secondary" className="font-semibold">
-                            {formatAmount(expense.amount)}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{expense.description}</TableCell>
-                        <TableCell>{expense.clientName || 'N/A'}</TableCell>
-                        <TableCell>{expense.company || 'N/A'}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            {getFileIcon(expense.fileName)}
-                            {expense.fileName ? (
-                              <div className="flex items-center gap-1">
+                </TableHeader>
+                <TableBody>
+                  {overdueExpenses.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                        No overdue expenses found
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    overdueExpenses.map((expense) => {
+                      const daysOverdue = calculateDaysOverdue(expense.date, expense.overdueDays);
+                      
+                      return (
+                        <TableRow key={expense.id}>
+                          <TableCell>
+                            <Badge variant="secondary" className="font-semibold">
+                              {formatAmount(expense.amount)}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{expense.description}</TableCell>
+                          <TableCell>{expense.clientName || 'N/A'}</TableCell>
+                          <TableCell>{expense.company || 'N/A'}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              {getFileIcon(expense.fileName)}
+                              {expense.fileName ? (
+                                <div className="flex items-center gap-1">
+                                  <span className="text-sm text-muted-foreground">
+                                    {expense.fileName}
+                                  </span>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleViewFile(expense.file, expense.fileName!)}
+                                    className="h-6 w-6 p-0"
+                                  >
+                                    <Eye className="w-3 h-3" />
+                                  </Button>
+                                </div>
+                              ) : (
                                 <span className="text-sm text-muted-foreground">
-                                  {expense.fileName}
+                                  No file
                                 </span>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleViewFile(expense.file, expense.fileName!)}
-                                  className="h-6 w-6 p-0"
-                                >
-                                  <Eye className="w-3 h-3" />
-                                </Button>
-                              </div>
-                            ) : (
-                              <span className="text-sm text-muted-foreground">
-                                No file
-                              </span>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {formatDate(expense.date)}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="destructive" className="flex items-center">
-                            <AlertTriangle className="w-3 h-3 mr-1" />
-                            {daysOverdue} days
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex gap-2">
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {formatDate(expense.date)}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="destructive" className="flex items-center">
+                              <AlertTriangle className="w-3 h-3 mr-1" />
+                              {daysOverdue} days
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex gap-2">
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => handleEditExpense(expense)}
+                              >
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm"
+                                    className="text-red-500 hover:text-red-700"
+                                  >
+                                    <Eye className="w-4 h-4" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      This action cannot be undone. This will permanently delete the expense 
+                                      with amount {formatAmount(expense.amount)}.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      onClick={() => handleDeleteExpense(expense.id)}
+                                      disabled={deletingId === expense.id}
+                                      className="bg-red-500 hover:bg-red-600"
+                                    >
+                                      {deletingId === expense.id ? 'Deleting...' : 'Delete'}
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          ) : (
+            // Overdue Invoices Table
+            <div className="border rounded-lg overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Invoice Number</TableHead>
+                    <TableHead>Company Name</TableHead>
+                    <TableHead>Candidate Name</TableHead>
+                    <TableHead>Amount</TableHead>
+                    <TableHead>Invoice Date</TableHead>
+                    <TableHead>Due Date</TableHead>
+                    <TableHead>Days Overdue</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {overdueInvoices.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                        No overdue invoices found
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    overdueInvoices.map((invoice) => {
+                      const daysOverdue = calculateDaysInvoiceOverdue(invoice.dueDate);
+                      
+                      return (
+                        <TableRow key={invoice.id}>
+                          <TableCell className="font-medium">
+                            {invoice.invoiceNumber}
+                          </TableCell>
+                          <TableCell>{invoice.companyName}</TableCell>
+                          <TableCell>{invoice.candidateName || 'N/A'}</TableCell>
+                          <TableCell>
+                            <Badge variant="secondary" className="font-semibold">
+                              {formatAmount(invoice.total)}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {formatDate(invoice.date)}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {formatDate(invoice.dueDate)}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="destructive" className="flex items-center">
+                              <AlertTriangle className="w-3 h-3 mr-1" />
+                              {daysOverdue} days
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
                             <Button 
                               variant="outline" 
                               size="sm"
-                              onClick={() => handleEditExpense(expense)}
+                              onClick={() => {
+                                // For now, we'll just show a toast
+                                toast.info('Invoice details would be shown here');
+                              }}
                             >
-                              <Edit className="w-4 h-4" />
+                              <Eye className="w-4 h-4 mr-1" />
+                              View
                             </Button>
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button 
-                                  variant="outline" 
-                                  size="sm"
-                                  className="text-red-500 hover:text-red-700"
-                                >
-                                  <Eye className="w-4 h-4" />
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    This action cannot be undone. This will permanently delete the expense 
-                                    with amount {formatAmount(expense.amount)}.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction
-                                    onClick={() => handleDeleteExpense(expense.id)}
-                                    disabled={deletingId === expense.id}
-                                    className="bg-red-500 hover:bg-red-600"
-                                  >
-                                    {deletingId === expense.id ? 'Deleting...' : 'Delete'}
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })
-                )}
-              </TableBody>
-            </Table>
-          </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </CardContent>
       </Card>
 

@@ -3,10 +3,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Search, ArrowUpDown, Filter, RefreshCw, CheckCircle, XCircle, Calendar } from 'lucide-react';
+import { Search, ArrowUpDown, Filter, RefreshCw, CheckCircle, XCircle, Calendar, Download } from 'lucide-react';
 import { useData } from '@/contexts/DataContext';
 import { useNotification } from '@/contexts/NotificationContext';
 import { toast } from 'react-toastify';
+import * as XLSX from 'xlsx';
 
 const ProfitLoss = () => {
   const { expenses, invoiceHistory, refreshData, addProfitLossReport } = useData();
@@ -16,6 +17,7 @@ const ProfitLoss = () => {
   const [filterYear, setFilterYear] = useState<string>('all');
   const [sortField, setSortField] = useState<'client' | 'revenue' | 'expenses' | 'profit'>('client');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [autoSavedReports, setAutoSavedReports] = useState<Set<string>>(new Set());
 
   // Get unique months and years from expenses
   const uniqueMonths = useMemo(() => {
@@ -109,8 +111,20 @@ const ProfitLoss = () => {
         if (invoice) {
           invoiceNumber = invoice.invoiceNumber;
           
+          // Handle partial payments
+          if (expense.partialPayment) {
+            // If partial payment is fully received, use the full invoice amount as revenue
+            if (expense.partialReceived) {
+              revenue = invoice.total;
+              revenueStatus = 'Received (Partial Completed)';
+            } else {
+              // For partial payments that are not fully received, use the partial amount as revenue
+              revenue = expense.partialAmount || 0;
+              revenueStatus = 'Pending (Partial)';
+            }
+          } 
           // If expense status is received, use invoice total as revenue
-          if (expense.status === 'received') {
+          else if (expense.status === 'received') {
             revenue = invoice.total;
             revenueStatus = 'Received';
           } else {
@@ -173,7 +187,66 @@ const ProfitLoss = () => {
     );
   }, [sortedData]);
 
-  // Save profit/loss report to database
+  // Auto-save report when data changes
+  useEffect(() => {
+    // Only auto-save if we have data and haven't already saved this combination
+    if (sortedData.length > 0 && totals.revenue > 0) {
+      const reportKey = `${filterMonth}-${filterYear}-${searchTerm}`;
+      
+      if (!autoSavedReports.has(reportKey)) {
+        // Auto-save the report
+        handleAutoSaveReport();
+        
+        // Mark this report as auto-saved
+        setAutoSavedReports(prev => new Set(prev).add(reportKey));
+      }
+    }
+  }, [sortedData, totals, filterMonth, filterYear, searchTerm]);
+
+  // Auto-save profit/loss report to database
+  const handleAutoSaveReport = async () => {
+    try {
+      // Prepare report data
+      const reportData = sortedData.map(item => ({
+        expenseId: item.id,
+        clientName: item.clientName,
+        company: item.company,
+        description: item.description,
+        expenseAmount: item.amount,
+        invoiceNumber: item.invoiceNumber,
+        revenue: item.revenue,
+        profit: item.profit
+      }));
+      
+      // Determine period based on filters
+      const period: 'monthly' | 'yearly' = filterMonth !== 'all' ? 'monthly' : 'yearly';
+      const year = filterYear !== 'all' ? filterYear : new Date().getFullYear().toString();
+      
+      // Create report object without summary fields
+      const report: any = {
+        period,
+        year,
+        // Add annualIncome field - store the profit as annual income for monthly reports
+        // For yearly reports, we'll set it to 0 or null instead of undefined
+        annualIncome: period === 'monthly' ? totals.profit : null,
+        reportData
+      };
+      
+      // Only add month property if it's not 'all'
+      if (filterMonth !== 'all') {
+        report.month = filterMonth;
+      }
+      
+      // Save to database
+      await addProfitLossReport(report);
+      
+      console.log('Profit/Loss report auto-saved successfully!');
+    } catch (error: any) {
+      console.error('Error auto-saving report:', error);
+    }
+  };
+
+  // Save profit/loss report to database and download as Excel
   const handleSaveReport = async () => {
     try {
       // Prepare report data
@@ -192,13 +265,12 @@ const ProfitLoss = () => {
       const period: 'monthly' | 'yearly' = filterMonth !== 'all' ? 'monthly' : 'yearly';
       const year = filterYear !== 'all' ? filterYear : new Date().getFullYear().toString();
       
-      // Create report object that matches the ProfitLossReport interface
+      // Create report object without summary fields
       const report: any = {
         period,
         year,
-        revenue: totals.revenue,
-        expenses: totals.expenses,
-        profit: totals.profit,
+        // Add annualIncome field - store the profit as annual income for monthly reports
+        annualIncome: period === 'monthly' ? totals.profit : undefined,
         reportData
       };
       
@@ -221,10 +293,67 @@ const ProfitLoss = () => {
         type: 'profit_loss_updated'
       });
       
-      toast.success('Profit/Loss report saved successfully!');
+      // Download as Excel
+      downloadReportAsExcel(reportData, filterMonth, filterYear);
+      
+      toast.success('Profit/Loss report saved and downloaded successfully!');
     } catch (error: any) {
       console.error('Error saving report:', error);
       toast.error(`Failed to save report: ${error.message || 'Unknown error'}`);
+    }
+  };
+
+  // Download report as Excel file
+  const downloadReportAsExcel = (reportData: any[], month: string, year: string) => {
+    try {
+      // Format the data for Excel with better alignment and spacing
+      const excelData = reportData.map(item => ({
+        'Client Name': item.clientName || 'N/A',
+        'Company': item.company || 'N/A',
+        'Description': item.description,
+        'Expense Amount': item.expenseAmount,
+        'Invoice Number': item.invoiceNumber || 'No Invoice',
+        'Revenue': item.revenue,
+        'Profit/Loss': item.profit
+      }));
+      
+      // Add totals row with proper spacing
+      excelData.push({
+        'Client Name': '',
+        'Company': '',
+        'Description': 'TOTAL',
+        'Expense Amount': totals.expenses,
+        'Invoice Number': '',
+        'Revenue': totals.revenue,
+        'Profit/Loss': totals.profit
+      });
+      
+      // Create worksheet with column widths for better alignment
+      const ws = XLSX.utils.json_to_sheet(excelData);
+      
+      // Set column widths for better alignment
+      ws['!cols'] = [
+        { wch: 15 }, // Client Name
+        { wch: 15 }, // Company
+        { wch: 25 }, // Description
+        { wch: 15 }, // Expense Amount
+        { wch: 15 }, // Invoice Number
+        { wch: 15 }, // Revenue
+        { wch: 15 }  // Profit/Loss
+      ];
+      
+      // Create workbook
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'ProfitLossReport');
+      
+      // Generate file name
+      const fileName = `ProfitLossReport_${month !== 'all' ? month + '_' : ''}${year}.xlsx`;
+      
+      // Download the file
+      XLSX.writeFile(wb, fileName);
+    } catch (error) {
+      console.error('Error generating Excel file:', error);
+      toast.error('Failed to generate Excel file');
     }
   };
 
@@ -302,7 +431,8 @@ const ProfitLoss = () => {
                 size="sm"
                 className="text-sm"
               >
-                Save Report
+                <Download className="w-4 h-4 mr-2" />
+                Save & Download Report
               </Button>
             </div>
           </div>
@@ -393,6 +523,7 @@ const ProfitLoss = () => {
                       <ArrowUpDown className="w-3 h-3" />
                     </Button>
                   </TableHead>
+                  <TableHead className="text-right text-xs">Partial Payment</TableHead>
                   <TableHead className="text-right text-xs">
                     <Button
                       variant="ghost"
@@ -423,13 +554,28 @@ const ProfitLoss = () => {
                         <TableCell className="text-right text-xs">
                           {item.revenueStatus === 'Received' ? (
                             <span className="text-primary font-medium">{formatAmount(item.revenue)}</span>
+                          ) : item.revenueStatus === 'Received (Partial Completed)' ? (
+                            <span className="text-green-600 font-medium">{formatAmount(item.revenue)}</span>
                           ) : (
                             <span className={item.revenueStatus === 'Pending' ? 'text-yellow-600' : 
                                      item.revenueStatus === 'received' ? 'text-primary' : 
                                      item.revenueStatus === 'pending' ? 'text-yellow-600' : 
+                                     item.revenueStatus === 'Pending (Partial)' ? 'text-blue-500' :
                                      'text-muted-foreground'}>
                               {item.revenueStatus.charAt(0).toUpperCase() + item.revenueStatus.slice(1)}
                             </span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right text-xs">
+                          {item.partialPayment ? (
+                            <div className="flex flex-col items-end">
+                              <span className="font-medium">{formatAmount(item.partialAmount || 0)}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {item.partialReceived ? 'Received' : 'Pending'}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
                           )}
                         </TableCell>
                         <TableCell className={`text-right font-medium text-xs ${item.profit >= 0 ? 'text-primary' : 'text-destructive'}`}>
@@ -447,6 +593,10 @@ const ProfitLoss = () => {
                       <TableCell className="text-right text-foreground text-xs">{formatAmount(totals.expenses)}</TableCell>
                       <TableCell></TableCell>
                       <TableCell className="text-right text-foreground text-xs">{formatAmount(totals.revenue)}</TableCell>
+                      <TableCell className="text-right text-foreground text-xs">
+                        {/* Calculate total partial payments */}
+                        {formatAmount(sortedData.filter(item => item.partialPayment).reduce((sum, item) => sum + (item.partialAmount || 0), 0))}
+                      </TableCell>
                       <TableCell className={`text-right text-xs ${totals.profit >= 0 ? 'text-primary' : 'text-destructive'}`}>
                         {formatAmount(totals.profit)}
                       </TableCell>
@@ -459,7 +609,7 @@ const ProfitLoss = () => {
                   </>
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground text-sm">
+                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground text-sm">
                       No expenses found
                     </TableCell>
                   </TableRow>
@@ -473,22 +623,41 @@ const ProfitLoss = () => {
           <h3 className="font-medium mb-2 text-sm">Profit & Loss Summary</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div className="bg-white p-3 rounded border">
-              <p className="text-xs text-muted-foreground">Total Revenue</p>
-              <p className="text-base font-bold text-primary">{formatAmount(totals.revenue)}</p>
+              <div className="text-xs text-muted-foreground">Total Revenue</div>
+              <div className="text-lg font-bold text-primary">{formatAmount(totals.revenue)}</div>
             </div>
             <div className="bg-white p-3 rounded border">
-              <p className="text-xs text-muted-foreground">Total Expenses</p>
-              <p className="text-base font-bold text-destructive">{formatAmount(totals.expenses)}</p>
+              <div className="text-xs text-muted-foreground">Total Expenses</div>
+              <div className="text-lg font-bold text-destructive">{formatAmount(totals.expenses)}</div>
             </div>
-            <div className={`bg-white p-3 rounded border ${totals.profit >= 0 ? 'border-primary' : 'border-destructive'}`}>
-              <p className="text-xs text-muted-foreground">Net Profit/Loss</p>
-              <p className={`text-base font-bold ${totals.profit >= 0 ? 'text-primary' : 'text-destructive'}`}>
+            <div className="bg-white p-3 rounded border">
+              <div className="text-xs text-muted-foreground">Net Profit/Loss</div>
+              <div className={`text-lg font-bold ${totals.profit >= 0 ? 'text-primary' : 'text-destructive'}`}>
                 {formatAmount(totals.profit)}
-              </p>
+              </div>
             </div>
           </div>
-          <div className="mt-3 text-xs text-muted-foreground">
-            <p><strong>How it works:</strong> Revenue is calculated based on expense status. When an expense is marked as "received", the associated invoice amount is added to revenue. Profit/Loss = Revenue - Expense.</p>
+          
+          {/* Additional summary information */}
+          <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="bg-white p-3 rounded border">
+              <div className="text-xs text-muted-foreground">Total Partial Payments</div>
+              <div className="text-lg font-bold text-blue-500">
+                {sortedData.filter(item => item.partialPayment).length}
+              </div>
+            </div>
+            <div className="bg-white p-3 rounded border">
+              <div className="text-xs text-muted-foreground">Pending Partial Payments</div>
+              <div className="text-lg font-bold text-yellow-500">
+                {sortedData.filter(item => item.partialPayment && !item.partialReceived).length}
+              </div>
+            </div>
+            <div className="bg-white p-3 rounded border">
+              <div className="text-xs text-muted-foreground">Completed Partial Payments</div>
+              <div className="text-lg font-bold text-green-500">
+                {sortedData.filter(item => item.partialPayment && item.partialReceived).length}
+              </div>
+            </div>
           </div>
         </div>
       </CardContent>

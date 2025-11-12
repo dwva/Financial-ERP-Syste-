@@ -86,6 +86,60 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
   }, [notifications]);
 
+  // Check for recipient notifications when the component mounts and periodically
+  useEffect(() => {
+    if (!user?.email) return;
+
+    // Check immediately on mount
+    checkForRecipientNotifications(notifications);
+
+    // Check every 30 seconds for new notifications
+    const interval = setInterval(() => {
+      checkForRecipientNotifications(notifications);
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [user?.email, notifications]);
+
+  // Function to check for recipient notifications
+  const checkForRecipientNotifications = (currentNotifications: Notification[]) => {
+    if (user?.email) {
+      try {
+        // Check for recipient notifications stored by the admin
+        const recipientNotifications = JSON.parse(localStorage.getItem('recipient_notifications') || '[]');
+        
+        // Filter notifications for the current user
+        const userNotifications = recipientNotifications.filter((notification: any) => 
+          notification.userId === user.email
+        );
+        
+        // Add these notifications to the user's notification list
+        if (userNotifications.length > 0) {
+          userNotifications.forEach((notification: any) => {
+            // Check if this notification already exists
+            const exists = currentNotifications.some(n => n.messageId === notification.messageId);
+            if (!exists) {
+              addNotification({
+                title: notification.title,
+                message: notification.message,
+                type: notification.type,
+                messageId: notification.messageId
+              });
+            }
+          });
+          
+          // Remove processed notifications from localStorage
+          const remainingNotifications = recipientNotifications.filter((notification: any) => 
+            notification.userId !== user.email
+          );
+          localStorage.setItem('recipient_notifications', JSON.stringify(remainingNotifications));
+        }
+      } catch (e) {
+        console.error('Error processing recipient notifications:', e);
+      }
+    }
+  };
+
   // Detect expense changes and create notifications
   useEffect(() => {
     try {

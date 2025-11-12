@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useData } from '@/contexts/DataContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useNotification } from '@/contexts/NotificationContext';
 import { Message } from '@/services/messageService';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Send, RefreshCw, FileText, Clock, Download, Trash2, Search, Eye, X } from 'lucide-react';
@@ -85,6 +86,7 @@ const FileViewerModal = ({
 const MessageUser = () => {
   const { employees, sendMessage, messages, loading: dataLoading, deleteMessage } = useData();
   const { user } = useAuth();
+  const { addNotification } = useNotification();
   const [selectedUser, setSelectedUser] = useState<string>('');
   const [subject, setSubject] = useState<string>('');
   const [content, setContent] = useState<string>('');
@@ -302,6 +304,37 @@ const MessageUser = () => {
 
       console.log('Message sent result:', result);
       console.log('Message ID:', result.id);
+
+      // Add notification for the admin who sent the message
+      addNotification({
+        title: 'Message Sent',
+        message: `Your message "${subject}" was sent to ${receiver.name || receiver.email}`,
+        type: 'new_message'
+      });
+
+      // Add notification for the recipient user
+      // We'll create a custom notification for the recipient
+      try {
+        // Create a notification entry that will be picked up by the recipient's notification system
+        const recipientNotification = {
+          title: 'New Message Received',
+          message: `You have a new message from Admin`,
+          type: 'new_message',
+          userId: selectedUser, // This will help identify the recipient
+          messageId: result.id
+        };
+        
+        // Store this in localStorage so the recipient's notification system can pick it up
+        const existingNotifications = JSON.parse(localStorage.getItem('recipient_notifications') || '[]');
+        existingNotifications.push({
+          ...recipientNotification,
+          timestamp: new Date().toISOString(),
+          read: false
+        });
+        localStorage.setItem('recipient_notifications', JSON.stringify(existingNotifications));
+      } catch (notificationError) {
+        console.error('Error creating recipient notification:', notificationError);
+      }
 
       toast.success('Message sent successfully!');
       

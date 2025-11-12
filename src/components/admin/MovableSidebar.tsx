@@ -12,12 +12,10 @@ import {
   Mail,
   ChevronLeft,
   ChevronRight,
-  GripVertical,
   LogOut,
   AlertTriangle,
   Settings
 } from 'lucide-react';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useData } from '@/contexts/DataContext';
 
 interface MovableSidebarProps {
@@ -38,9 +36,6 @@ const MovableSidebar = ({
   isMobile = false
 }: MovableSidebarProps) => {
   const [sidebarExpanded, setSidebarExpanded] = useState(!isMobile);
-  const [sidebarPosition, setSidebarPosition] = useState({ x: 0, y: 0 });
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [overdueCount, setOverdueCount] = useState(0);
   const { expenses } = useData();
   const sidebarRef = useRef<HTMLDivElement>(null);
@@ -63,77 +58,20 @@ const MovableSidebar = ({
 
   const menuItems = [
     { id: 'analytics', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'expenses', label: 'All Expenses', icon: Wallet },
     { id: 'expense-overview', label: 'Expenses Overview', icon: FileText },
-    { id: 'users', label: 'User Management', icon: Users },
+    { id: 'expenses', label: 'All Expenses', icon: Wallet },
     { id: 'expense-status', label: 'Expense Status', icon: FileText },
-    { id: 'overdue-expenses', label: 'Overdue Expenses', icon: AlertTriangle },
-    { id: 'notifications', label: 'Notifications', icon: Bell },
-    { id: 'service-charges', label: 'Service Charges', icon: FileSpreadsheet },
     { id: 'invoice-generation', label: 'Invoice Generation', icon: FileText },
+    { id: 'overdue-expenses', label: 'Overdue Expenses', icon: AlertTriangle },
     { id: 'profit-loss', label: 'Profit & Loss', icon: TrendingUp },
-    { id: 'messages', label: 'Messages', icon: Mail },
+    { id: 'service-charges', label: 'Service Charges', icon: FileSpreadsheet },
     { id: 'dropdown-manager', label: 'Data Management', icon: Settings },
+    { id: 'users', label: 'User Management', icon: Users }
   ];
-
-  // Get user initials for avatar
-  const getUserInitials = (email: string | null) => {
-    if (!email) return 'AD';
-    const name = email.split('@')[0];
-    return name.length > 1 ? name.substring(0, 2).toUpperCase() : name.toUpperCase();
-  };
-
-  // Handle mouse down for dragging
-  const handleMouseDown = (e: React.MouseEvent) => {
-    // Only allow dragging on desktop
-    if (isMobile || !sidebarRef.current) return;
-    
-    const rect = sidebarRef.current.getBoundingClientRect();
-    setDragOffset({
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top
-    });
-    setIsDragging(true);
-  };
-
-  // Handle mouse move for dragging
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (isDragging && sidebarRef.current && !isMobile) {
-        // Constrain dragging within viewport
-        const sidebarRect = sidebarRef.current.getBoundingClientRect();
-        const maxX = window.innerWidth - sidebarRect.width;
-        const maxY = window.innerHeight - sidebarRect.height;
-        
-        const newX = Math.max(0, Math.min(e.clientX - dragOffset.x, maxX));
-        const newY = Math.max(0, Math.min(e.clientY - dragOffset.y, maxY));
-        
-        setSidebarPosition({
-          x: newX,
-          y: newY
-        });
-      }
-    };
-
-    const handleMouseUp = () => {
-      setIsDragging(false);
-    };
-
-    if (isDragging) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-    }
-
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [isDragging, dragOffset, isMobile]);
 
   // Reset position when switching between mobile and desktop
   useEffect(() => {
     if (isMobile) {
-      setSidebarPosition({ x: 0, y: 0 });
       setSidebarExpanded(false); // Collapse sidebar on mobile by default
     } else {
       setSidebarExpanded(true); // Expand sidebar on desktop by default
@@ -144,25 +82,13 @@ const MovableSidebar = ({
     <div 
       ref={sidebarRef}
       style={{
-        position: isMobile ? 'relative' : isDragging ? 'fixed' : 'sticky',
-        left: isMobile ? 'auto' : isDragging ? sidebarPosition.x : 'auto',
-        top: isMobile ? 'auto' : isDragging ? sidebarPosition.y : 'auto',
-        zIndex: isMobile ? 'auto' : isDragging ? 1000 : 'auto',
         width: isMobile ? '100%' : sidebarExpanded ? '16rem' : '5rem',
-        transition: isDragging ? 'none' : 'width 0.3s ease',
         height: '100%',
-        maxHeight: '100vh'
+        maxHeight: '100vh',
+        marginTop: !isMobile ? '4rem' : '0'
       }}
-      className="bg-white rounded-r-3xl shadow-lg flex flex-col"
+      className="bg-white shadow-lg flex flex-col"
     >
-      {/* Drag handle - only show on desktop */}
-      {!isMobile && (
-        <div 
-          className="absolute top-0 right-0 w-2 h-full cursor-move z-10"
-          onMouseDown={handleMouseDown}
-        />
-      )}
-      
       <div className="p-3 border-b border-grey-200 flex items-center justify-between">
         {sidebarExpanded && (
           <h1 className="text-base font-semibold text-foreground font-body">Admin Dashboard</h1>
@@ -177,7 +103,7 @@ const MovableSidebar = ({
         </Button>
       </div>
       
-      <nav className="mt-3 px-2 flex-1 overflow-y-auto">
+      <nav className="mt-3 px-2 flex-1 overflow-y-auto space-y-2">
         {menuItems.map((item) => {
           const Icon = item.icon;
           return (
@@ -196,7 +122,7 @@ const MovableSidebar = ({
                   }
                 }
               }}
-              className={`w-full flex items-center px-3 py-2 text-left transition-all duration-300 rounded-lg mb-1 ${
+              className={`w-full flex items-center px-3 py-2 text-left transition-all duration-300 rounded-lg ${
                 activeSection === item.id
                   ? 'bg-primary text-primary-foreground'
                   : 'text-foreground hover:bg-muted'
@@ -223,37 +149,6 @@ const MovableSidebar = ({
           );
         })}
       </nav>
-      
-      {/* User Profile and Logout */}
-      <div className="p-3 border-t border-grey-200">
-        <div className="flex items-center gap-2 mb-2">
-          <Avatar className="h-8 w-8">
-            <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-              {getUserInitials(user?.email)}
-            </AvatarFallback>
-          </Avatar>
-          {sidebarExpanded && (
-            <div className="font-body">
-              <p className="text-xs font-medium text-foreground truncate">
-                {user?.email ? user.email.split('@')[0] : 'Admin'}
-              </p>
-              <p className="text-xs text-muted-foreground">Administrator</p>
-            </div>
-          )}
-        </div>
-        
-        {sidebarExpanded && (
-          <Button 
-            variant="outline" 
-            onClick={onLogout}
-            className="w-full flex items-center gap-2 justify-start text-xs p-2"
-            size="sm"
-          >
-            <LogOut className="h-4 w-4" />
-            <span>Logout</span>
-          </Button>
-        )}
-      </div>
     </div>
   );
 };

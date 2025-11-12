@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useData } from '@/contexts/DataContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,12 +12,13 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'react-toastify';
-import { UserPlus, Trash2, Users, User, Building, Hash, Filter, Search, Phone, Mail, Info, CheckCircle, Camera } from 'lucide-react';
+import { UserPlus, Trash2, Users, User, Building, Hash, Filter, Search, Phone, Mail, Info, CheckCircle, Camera, Key } from 'lucide-react';
 import { reauthenticateAsAdmin } from '@/services/firebaseService';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 const UserManagement = () => {
   const { employees, addEmployee, deleteEmployee, updateEmployeeStatus, refreshData } = useData();
+  const { resetPassword } = useAuth();
   const [newEmail, setNewEmail] = useState('');
   const [newUsername, setNewUsername] = useState('');
   const [newMobile, setNewMobile] = useState('');
@@ -30,6 +32,9 @@ const UserManagement = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [employeeToDelete, setEmployeeToDelete] = useState<{id: string, email: string} | null>(null);
   const [selectedEmployees, setSelectedEmployees] = useState<string[]>([]);
+  const [resetPasswordDialogOpen, setResetPasswordDialogOpen] = useState(false);
+  const [employeeToReset, setEmployeeToReset] = useState<{id: string, email: string} | null>(null);
+  const [resetPasswordValue, setResetPasswordValue] = useState('');
 
   // Get unique sectors from employees
   const uniqueSectors = useMemo(() => {
@@ -232,6 +237,31 @@ const UserManagement = () => {
     } catch (error) {
       console.error('Error deleting employees:', error);
       toast.error('Failed to delete employees. Please try again.');
+    }
+  };
+
+  // Add function to handle reset password
+  const handleResetPassword = (id: string, email: string) => {
+    setEmployeeToReset({id, email});
+    setResetPasswordValue(''); // Reset the password input
+    setResetPasswordDialogOpen(true);
+  };
+
+  // Add function to confirm reset password
+  const confirmResetPassword = async () => {
+    if (employeeToReset && resetPasswordValue) {
+      try {
+        // Reset the password in the database
+        await resetPassword(employeeToReset.email, resetPasswordValue);
+        toast.success('Password reset successfully!');
+      } catch (error) {
+        console.error('Error resetting password:', error);
+        toast.error('Failed to reset password. Please try again.');
+      } finally {
+        setResetPasswordDialogOpen(false);
+        setEmployeeToReset(null);
+        setResetPasswordValue('');
+      }
     }
   };
 
@@ -503,17 +533,28 @@ const UserManagement = () => {
                       </TableCell>
                       <TableCell className="whitespace-nowrap">{getStatusBadge(employee.status)}</TableCell>
                       <TableCell className="text-right whitespace-nowrap">
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => handleDeleteEmployee(employee.id, employee.email)}
-                          className="gap-2"
-                          disabled={employee.email === 'admin@company.com' || 
-                                    employee.email === 'adminxyz@gmail.com'}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                          <span className="hidden sm:inline">Delete</span>
-                        </Button>
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleResetPassword(employee.id, employee.email)}
+                            className="gap-2"
+                          >
+                            <Key className="w-4 h-4" />
+                            <span className="hidden sm:inline">Reset</span>
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => handleDeleteEmployee(employee.id, employee.email)}
+                            className="gap-2"
+                            disabled={employee.email === 'admin@company.com' || 
+                                      employee.email === 'adminxyz@gmail.com'}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                            <span className="hidden sm:inline">Delete</span>
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   );
@@ -537,6 +578,39 @@ const UserManagement = () => {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDeleteEmployee} className="bg-destructive hover:bg-destructive/90">
               Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      
+      {/* Reset Password Dialog */}
+      <AlertDialog open={resetPasswordDialogOpen} onOpenChange={setResetPasswordDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reset Password</AlertDialogTitle>
+            <AlertDialogDescription>
+              Enter a new password for {employeeToReset?.email}. The user will be required to change this password on their next login.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-4">
+            <Label htmlFor="reset-password" className="block mb-2">New Password</Label>
+            <Input
+              id="reset-password"
+              type="password"
+              value={resetPasswordValue}
+              onChange={(e) => setResetPasswordValue(e.target.value)}
+              placeholder="Enter new password"
+              minLength={6}
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={confirmResetPassword} 
+              className="bg-primary hover:bg-primary/90"
+              disabled={!resetPasswordValue || resetPasswordValue.length < 6}
+            >
+              Reset Password
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
